@@ -1,78 +1,77 @@
+import Link from "next/link";
 import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
 
-const geistSans = Geist({
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowRight, faGear } from "@fortawesome/free-solid-svg-icons";
+
+import { Host_Grotesk } from "next/font/google";
+const hostGrotesk = Host_Grotesk({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
 export default function Home() {
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black`}
-    >
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+    <div className={`${hostGrotesk.className}`}>
+      <div className="flex items-center justify-center bg-orange-400 px-8 py-6 text-stone-900">
+        <h1 className="text-2xl font-black">Spanish App!!!!</h1>
+        <Link href="/settings" className="ml-auto text-orange-400 transition">
+          <FontAwesomeIcon
+            icon={faGear}
+            className="rounded-full bg-stone-900 px-1.25 py-2 text-xl hover:bg-stone-900/60"
+            aria-label="Settings"
+          />
+        </Link>
+      </div>
+
+      <div className="mx-auto mt-16 flex max-w-216 flex-col gap-y-8 px-8 py-4">
+        <Link
+          href="/lessons"
+          className="group flex items-center justify-center rounded-full bg-orange-400 py-3 pr-6 pl-4 text-4xl font-bold text-white shadow-lg shadow-orange-400/50 transition hover:text-white/50"
+        >
+          <FontAwesomeIcon
+            icon={faArrowRight}
+            className="mr-auto rounded-full bg-white px-1 py-2 text-3xl text-orange-400 transition group-hover:translate-x-1/2 group-active:translate-x-full"
+            aria-labelledby="lessons-btn-text"
+          />
+          <span id="lessons-btn-text">Lessons</span>
+        </Link>
+        <Link
+          href="/conversation"
+          className="group flex items-center justify-center rounded-full bg-orange-400 py-3 pr-6 pl-4 text-4xl font-bold text-white shadow-lg shadow-orange-400/50 transition hover:text-white/50"
+        >
+          <FontAwesomeIcon
+            icon={faArrowRight}
+            className="mr-auto rounded-full bg-white px-1 py-2 text-3xl text-orange-400 transition duration-200 group-hover:translate-x-1/2 group-active:translate-x-full"
+            aria-labelledby="conversation-btn-text"
+          />
+          <span id="conversation-btn-text">Conversation</span>
+        </Link>
+      </div>
+
+      <div className="">
         <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+          src="/mascot-placeholder.png"
+          width={400}
+          height={500}
+          alt="Mascot"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the index.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+        <div className="flex items-center justify-center">
+          <div
+            className={`absolute bottom-16 flex h-4 w-5/6 items-center justify-center rounded-full bg-neutral-500/25`}
+          >
+            <progress
+              className={`win-rate-bar-orange win-rate-bar-rounded mx-auto h-full w-full appearance-none overflow-hidden rounded-full bg-neutral-500/10`}
+              value={0.7}
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-center">
+          <p className="absolute bottom-9 mx-auto mb-0.5 flex w-5/6 items-center justify-start px-1 text-sm text-stone-400">
+            Today's progress
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs/pages/getting-started?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

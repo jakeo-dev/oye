@@ -1,26 +1,34 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+.win-rate-bar-orange {
+  background-color: transparent;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.win-rate-bar-orange::-webkit-progress-bar {
+  background-color: transparent;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.win-rate-bar-orange::-webkit-progress-value {
+  background-color: oklch(75% 0.183 55.934);
 }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.win-rate-bar-orange::-moz-progress-bar {
+  background-color: oklch(75% 0.183 55.934);
+}
+.win-rate-bar-white {
+  background-color: transparent;
+}
+.win-rate-bar-white::-webkit-progress-bar {
+  background-color: transparent;
+}
+.win-rate-bar-white::-webkit-progress-value {
+  background-color: oklch(100% 0.00011 271.152);
+}
+.win-rate-bar-white::-moz-progress-bar {
+  background-color: oklch(100% 0.00011 271.152);
+}
+.win-rate-bar-rounded::-webkit-progress-value {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+.win-rate-bar-rounded::-moz-progress-bar {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
 }
