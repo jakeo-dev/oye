@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { Link } from "wouter";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronLeft,
@@ -8,15 +7,9 @@ import {
   faVolume,
 } from "@fortawesome/free-solid-svg-icons";
 
-import { Host_Grotesk } from "next/font/google";
-const hostGrotesk = Host_Grotesk({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
 export default function Conversation() {
   return (
-    <div className={`${hostGrotesk.className}`}>
+    <div className="font-sans">
       <div className="h-[33vh] bg-orange-400 px-8 py-6 text-stone-900">
         <div className="mb-12 flex w-full items-center justify-center gap-4">
           <Link href="/" className="text-orange-400 transition">
@@ -51,7 +44,7 @@ export default function Conversation() {
           >
             <FontAwesomeIcon
               icon={faVolume}
-              className="rounded-full bg-stone-900 px-1.25 py-2 text-3xl hover:bg-stone-900/60"
+              className="rounded-full bg-stone-900 px-1.5 py-2 text-3xl hover:bg-stone-900/60"
               aria-label="Say text"
             />
           </button>

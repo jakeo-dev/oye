@@ -1,30 +1,22 @@
-import Link from "next/link";
-import Image from "next/image";
-
+import { Link } from "wouter";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight, faGear } from "@fortawesome/free-solid-svg-icons";
 
-import { Host_Grotesk } from "next/font/google";
-const hostGrotesk = Host_Grotesk({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
 export default function Home() {
   return (
-    <div className={`${hostGrotesk.className}`}>
+    <div className="font-sans">
       <div className="flex items-center justify-center bg-orange-400 px-8 py-6 text-stone-900">
         <h1 className="text-2xl font-black">Spanish App!!!!</h1>
         <Link href="/settings" className="ml-auto text-orange-400 transition">
           <FontAwesomeIcon
             icon={faGear}
-            className="rounded-full bg-stone-900 px-1.25 py-2 text-xl hover:bg-stone-900/60"
+            className="rounded-full bg-stone-900 px-1.5 py-2 text-xl hover:bg-stone-900/60"
             aria-label="Settings"
           />
         </Link>
       </div>
 
-      <div className="mx-auto mt-16 flex max-w-216 flex-col gap-y-8 px-8 py-4">
+      <div className="mx-auto mt-16 flex max-w-xl flex-col gap-y-8 px-8 py-4">
         <Link
           href="/lessons"
           className="group flex items-center justify-center rounded-full bg-orange-400 py-3 pr-6 pl-4 text-4xl font-bold text-white shadow-lg shadow-orange-400/50 transition hover:text-white/50"
@@ -49,19 +41,18 @@ export default function Home() {
         </Link>
       </div>
 
-      <div className="">
-        <Image
+      <div className="relative">
+        <img
           src="/mascot-placeholder.png"
           width={400}
           height={500}
           alt="Mascot"
+          className="mx-auto"
         />
         <div className="flex items-center justify-center">
-          <div
-            className={`absolute bottom-16 flex h-4 w-5/6 items-center justify-center rounded-full bg-neutral-500/25`}
-          >
+          <div className="absolute bottom-16 flex h-4 w-5/6 items-center justify-center rounded-full bg-neutral-500/25">
             <progress
-              className={`win-rate-bar-orange win-rate-bar-rounded mx-auto h-full w-full appearance-none overflow-hidden rounded-full bg-neutral-500/10`}
+              className="win-rate-bar-orange win-rate-bar-rounded mx-auto h-full w-full appearance-none overflow-hidden rounded-full bg-neutral-500/10"
               value={0.7}
             />
           </div>
