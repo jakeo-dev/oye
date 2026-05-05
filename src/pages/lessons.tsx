@@ -17,7 +17,7 @@ export default function Lessons() {
   return (
     <div className={`${hostGrotesk.className}`}>
       <div className="h-[33vh] bg-orange-400 px-8 py-6 text-stone-900">
-        <div className="mb-12 flex w-full items-start">
+        <div className="mx-auto mb-12 flex w-full max-w-200 items-start">
           <Link href="/" className="mr-auto text-orange-400 transition">
             <FontAwesomeIcon
               icon={faChevronLeft}
@@ -41,7 +41,7 @@ export default function Lessons() {
         </div>
       </div>
 
-      <div className="flex items-center justify-center">
+      <div className="flex mx-auto max-w-200 items-center justify-center">
         <button
           onClick={() => {}}
           className="group absolute bottom-48 mx-auto flex w-min items-center justify-center rounded-full bg-white px-3 py-3.5 text-6xl font-bold text-white shadow-lg shadow-orange-400/50 transition hover:text-white/50"

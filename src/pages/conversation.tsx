@@ -18,7 +18,7 @@ export default function Conversation() {
   return (
     <div className={`${hostGrotesk.className}`}>
       <div className="h-[33vh] bg-orange-400 px-8 py-6 text-stone-900">
-        <div className="mb-12 flex w-full items-center justify-center gap-4">
+        <div className="mx-auto mb-12 flex w-full max-w-200 items-center justify-center gap-4">
           <Link href="/" className="text-orange-400 transition">
             <FontAwesomeIcon
               icon={faChevronLeft}
@@ -43,7 +43,7 @@ export default function Conversation() {
           </Link>
         </div>
 
-        <div className="flex items-center justify-center">
+        <div className="mx-auto flex max-w-200 items-center justify-center">
           <h1 className="text-left text-4xl font-black">Hola, ¿cómo estás?</h1>
           <button
             onClick={() => {}}
