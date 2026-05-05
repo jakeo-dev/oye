@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Spanish App"
+version = "1.0.0"
+id = "artifacts/spanish-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23930
+
+[services.development]
+run = "pnpm --filter @workspace/spanish-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/spanish-app", "run", "build" ]
+publicDir = "artifacts/spanish-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23930"
+BASE_PATH = "/"
