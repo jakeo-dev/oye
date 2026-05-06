@@ -69,7 +69,7 @@ export default function Home() {
         </div>
         <div className="flex items-center justify-center">
           <p className="absolute bottom-9 mx-auto mb-0.5 flex w-5/6 items-center justify-start px-1 text-sm text-stone-400 md:w-2/3 lg:w-1/2">
-            Today's progress
+            Today&apos;s progress
           </p>
         </div>
       </div>
