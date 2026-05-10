@@ -16,18 +16,9 @@ const hostGrotesk = Host_Grotesk({
 export default function Lessons() {
   return (
     <div className={`${hostGrotesk.className}`}>
-      <div className="h-[33vh] bg-orange-400 px-8 py-6 text-stone-900">
-        <div className="mx-auto mb-12 flex w-full max-w-200 items-start">
-          <Link href="/" className="mr-auto text-orange-400 transition">
-            <FontAwesomeIcon
-              icon={faChevronLeft}
-              className="rounded-full bg-stone-900 px-1 py-[6.5px] text-xl hover:bg-stone-900/60"
-              aria-label="Back"
-            />
-          </Link>
-        </div>
-        <div className="flex items-center justify-center">
-          <h1 className="text-left text-4xl font-black">Hola, ¿cómo estás?</h1>
+      <div className="flex h-[33vh] items-center bg-orange-400 px-8 py-6 text-stone-900">
+        <div className="mx-auto flex h-min w-full max-w-200 items-center">
+          <h1 className="text-4xl font-black">Hola, ¿cómo estás?</h1>
           <button
             onClick={() => {}}
             className="ml-auto text-orange-400 transition"
@@ -41,7 +32,7 @@ export default function Lessons() {
         </div>
       </div>
 
-      <div className="flex mx-auto max-w-200 items-center justify-center">
+      <div className="mx-auto flex max-w-200 items-center justify-center">
         <button
           onClick={() => {}}
           className="group absolute bottom-48 mx-auto flex w-min items-center justify-center rounded-full bg-white px-3 py-3.5 text-6xl font-bold text-white shadow-lg shadow-orange-400/50 transition hover:text-white/50"
