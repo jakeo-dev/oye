@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faChevronLeft,
-  faGear,
   faMicrophone,
+  faTrash,
   faVolume,
 } from "@fortawesome/free-solid-svg-icons";
 import type { ConversationMessage, Lesson } from "@/server/types";
@@ -72,6 +70,27 @@ export default function Conversation() {
     setStatus("");
   }
 
+  async function clearConversation() {
+    if (messages.length === 0) {
+      return;
+    }
+
+    setStatus("Clearing conversation...");
+    const endpoint = lesson
+      ? `/api/conversation?lessonId=${encodeURIComponent(lesson.id)}`
+      : "/api/conversation";
+    const response = await fetch(endpoint, { method: "DELETE" });
+    const data = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setStatus(data.error ?? "Could not clear conversation.");
+      return;
+    }
+
+    setMessages([]);
+    setStatus("");
+  }
+
   return (
     <div className={`${hostGrotesk.className}`}>
       <div className="flex h-[33vh] items-center bg-orange-400 px-8 py-6 text-stone-900">
@@ -91,6 +110,18 @@ export default function Conversation() {
       </div>
 
       <main className="mx-auto mt-8 flex max-w-200 flex-col gap-4 px-8">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={clearConversation}
+            disabled={messages.length === 0}
+            aria-label="Clear conversation"
+            className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-sm font-bold text-stone-100 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
+          >
+            <FontAwesomeIcon icon={faTrash} aria-hidden="true" />
+            Clear
+          </button>
+        </div>
         <div className="flex min-h-48 flex-col gap-3">
           {messages.map((message) => (
             <p
@@ -105,7 +136,7 @@ export default function Conversation() {
             </p>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <input
             value={userText}
             onChange={(event) => setUserText(event.target.value)}
@@ -118,6 +149,15 @@ export default function Conversation() {
             aria-label="Conversation reply"
           />
           <button
+            type="button"
+            onClick={() => {}}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-xl text-orange-400 shadow-md shadow-orange-400/25 transition hover:bg-stone-100"
+            aria-label="Speak"
+            title="Speak"
+          >
+            <FontAwesomeIcon icon={faMicrophone} />
+          </button>
+          <button
             onClick={sendMessage}
             className="rounded-full bg-stone-900 px-5 py-3 font-bold text-white transition hover:bg-stone-700"
           >
@@ -126,19 +166,6 @@ export default function Conversation() {
         </div>
         {status ? <p className="text-sm text-stone-500">{status}</p> : null}
       </main>
-
-      <div className="flex items-center justify-center">
-        <button
-          onClick={() => {}}
-          className="group absolute bottom-48 mx-auto flex w-min items-center justify-center rounded-full bg-white px-3 py-3.5 text-6xl font-bold text-white shadow-lg shadow-orange-400/50 transition hover:text-white/50"
-        >
-          <FontAwesomeIcon
-            icon={faMicrophone}
-            className="mr-auto rounded-full bg-white px-3 py-4 text-orange-400 transition group-hover:translate-x-1/2"
-            aria-label="Speak"
-          />
-        </button>
-      </div>
     </div>
   );
 }
