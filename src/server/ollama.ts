@@ -9,6 +9,10 @@ type OllamaGenerateResponse = {
   response?: string;
 };
 
+type OllamaErrorResponse = {
+  error?: unknown;
+};
+
 const defaultBaseUrl = "http://127.0.0.1:11434";
 const defaultModel = "llama3.2";
 
@@ -44,6 +48,25 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+async function createOllamaError(response: Response): Promise<Error> {
+  let detail = "";
+
+  try {
+    const rawBody = await response.text();
+    if (rawBody) {
+      const parsed = JSON.parse(rawBody) as OllamaErrorResponse;
+      detail =
+        typeof parsed.error === "string"
+          ? `: ${parsed.error}`
+          : `: ${rawBody.slice(0, 240)}`;
+    }
+  } catch {
+    // Keep the status-only message if Ollama returns a non-JSON error body.
+  }
+
+  return new Error(`Ollama request failed with ${response.status}${detail}.`);
 }
 
 function createFallbackLesson(input: LessonGenerationInput): Lesson {
@@ -99,7 +122,7 @@ export async function generateLessonWithOllama(
   });
 
   if (!response.ok) {
-    throw new Error(`Ollama request failed with ${response.status}.`);
+    throw await createOllamaError(response);
   }
 
   const data = (await response.json()) as OllamaGenerateResponse;
@@ -154,7 +177,7 @@ export async function generateConversationReply(
   });
 
   if (!response.ok) {
-    throw new Error(`Ollama request failed with ${response.status}.`);
+    throw await createOllamaError(response);
   }
 
   const data = (await response.json()) as OllamaGenerateResponse;
@@ -164,4 +187,3 @@ export async function generateConversationReply(
 export function generateFallbackLesson(input: LessonGenerationInput): Lesson {
   return createFallbackLesson(input);
 }
-

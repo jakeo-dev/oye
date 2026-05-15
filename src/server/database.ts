@@ -93,6 +93,21 @@ export async function saveConversationMessages(
   return messages;
 }
 
+export async function clearConversationMessages(
+  lessonId?: string,
+): Promise<number> {
+  const database = await readDatabase();
+  const previousCount = database.conversationMessages.length;
+  database.conversationMessages =
+    lessonId === undefined
+      ? []
+      : database.conversationMessages.filter(
+          (message) => message.lessonId !== lessonId,
+        );
+  await writeDatabase(database);
+  return previousCount - database.conversationMessages.length;
+}
+
 export async function listConversationMessages(
   lessonId?: string,
 ): Promise<ConversationMessage[]> {
