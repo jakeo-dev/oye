@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 import {
+  clearConversationMessages,
   getLesson,
   listConversationMessages,
   saveConversationMessages,
@@ -31,6 +32,14 @@ export default async function handler(
       typeof req.query.lessonId === "string" ? req.query.lessonId : undefined;
     const messages = await listConversationMessages(lessonId);
     res.status(200).json({ messages });
+    return;
+  }
+
+  if (req.method === "DELETE") {
+    const lessonId =
+      typeof req.query.lessonId === "string" ? req.query.lessonId : undefined;
+    const deletedCount = await clearConversationMessages(lessonId);
+    res.status(200).json({ deletedCount, messages: [] });
     return;
   }
 
@@ -72,7 +81,6 @@ export default async function handler(
     return;
   }
 
-  res.setHeader("Allow", "GET, POST");
+  res.setHeader("Allow", "GET, POST, DELETE");
   res.status(405).json({ error: "Method not allowed." });
 }
-
