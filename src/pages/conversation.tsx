@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMicrophone,
   faTrash,
-    faStop,
+  faStop,
   faVolume,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -108,6 +108,107 @@ export default function Conversation() {
     setStatus("");
   }
 
+  function startListening() {
+    const SpeechRecognitionCtor =
+      typeof window !== "undefined"
+        ? window.SpeechRecognition ?? window.webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognitionCtor) {
+      setStatus("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+
+    baseTextRef.current = userText;
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "es-ES";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: SpeechRecognitionResultListEvent) => {
+      let spoken = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const first = result?.[0];
+        if (first?.transcript?.length) {
+          spoken += first.transcript;
+        }
+      }
+      const spokenTrimmed = spoken.trim();
+      const prefix = baseTextRef.current.trim();
+      const merged =
+        prefix && spokenTrimmed
+          ? `${prefix} ${spokenTrimmed}`
+          : spokenTrimmed || prefix;
+      setUserText(merged);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      setIsListening(false);
+      recognitionRef.current = null;
+      const code = event.error ?? "unknown";
+      if (code === "aborted" || code === "no-speech") {
+        setStatus("");
+        return;
+      }
+      if (code === "not-allowed") {
+        setStatus(
+          "Microphone access denied. Allow the mic for this site and try again.",
+        );
+        return;
+      }
+      setStatus(`Speech error: ${code}. Try again or type your message.`);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+      setStatus((current) => (current === "Listening..." ? "" : current));
+    };
+
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+      setIsListening(true);
+      setStatus("Listening...");
+    } catch {
+      setIsListening(false);
+      recognitionRef.current = null;
+      setStatus("Could not start speech recognition. Try refreshing the page.");
+    }
+  }
+
+  function stopListening() {
+    if (!recognitionRef.current || !isListening) {
+      return;
+    }
+    try {
+      recognitionRef.current.stop();
+    } catch {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      setIsListening(false);
+    }
+  }
+
+  function handleMicClick() {
+    if (isListening) {
+      stopListening();
+      return;
+    }
+    startListening();
+  }
+
   return (
     <div
       className={`${hostGrotesk.className} relative isolate min-h-[calc(100dvh-5.5rem)] overflow-hidden bg-stone-950 text-stone-100`}
@@ -155,6 +256,21 @@ export default function Conversation() {
         </section>
 
         <main className="mt-6 flex min-h-0 flex-1 flex-col gap-5">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                void clearConversation();
+              }}
+              disabled={messages.length === 0}
+              aria-label="Clear conversation"
+              className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-sm font-bold text-stone-100 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
+            >
+              <FontAwesomeIcon icon={faTrash} aria-hidden="true" />
+              Clear
+            </button>
+          </div>
+
           <div
             className="flex max-h-[min(52vh,28rem)] min-h-40 flex-col gap-3 overflow-y-auto rounded-2xl border border-stone-700/60 bg-stone-900/30 p-4 ring-1 ring-white/5 sm:p-5"
             role="log"
@@ -180,27 +296,14 @@ export default function Conversation() {
             ))}
           </div>
 
-      <main className="mx-auto mt-8 flex max-w-200 flex-col gap-4 px-8">
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={clearConversation}
-            disabled={messages.length === 0}
-            aria-label="Clear conversation"
-            className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-sm font-bold text-stone-100 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
-          >
-            <FontAwesomeIcon icon={faTrash} aria-hidden="true" />
-            Clear
-          </button>
-        </div>
-        <div className="flex min-h-48 flex-col gap-3">
-          {messages.map((message) => (
-            <p
-              key={message.id}
-              className={`max-w-[85%] rounded-lg px-4 py-3 ${
-                message.role === "user"
-                  ? "ml-auto bg-orange-400 text-white"
-                  : "bg-stone-100 text-stone-900"
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+            <button
+              type="button"
+              onClick={handleMicClick}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
+                isListening
+                  ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
+                  : "border-stone-600/80 bg-stone-800/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
               }`}
               aria-label={isListening ? "Stop recording" : "Start speaking"}
             >
@@ -232,38 +335,9 @@ export default function Conversation() {
             <p className="text-sm text-stone-400" role="status">
               {status}
             </p>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            value={userText}
-            onChange={(event) => setUserText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                sendMessage();
-              }
-            }}
-            className="min-w-0 flex-1 rounded-lg border border-stone-300 px-4 py-3"
-            aria-label="Conversation reply"
-          />
-          <button
-            type="button"
-            onClick={() => {}}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-xl text-orange-400 shadow-md shadow-orange-400/25 transition hover:bg-stone-100"
-            aria-label="Speak"
-            title="Speak"
-          >
-            <FontAwesomeIcon icon={faMicrophone} />
-          </button>
-          <button
-            onClick={sendMessage}
-            className="rounded-full bg-stone-900 px-5 py-3 font-bold text-white transition hover:bg-stone-700"
-          >
-            Send
-          </button>
-        </div>
-        {status ? <p className="text-sm text-stone-500">{status}</p> : null}
-      </main>
+          ) : null}
+        </main>
+      </div>
     </div>
   );
 }
