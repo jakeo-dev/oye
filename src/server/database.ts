@@ -84,6 +84,23 @@ export async function getProgress(
   return database.progress.find((item) => item.lessonId === lessonId) ?? null;
 }
 
+export async function getProgressSummary(): Promise<{
+  completedLessonCount: number;
+  lessonTotal: number;
+  fraction: number;
+}> {
+  const database = await readDatabase();
+  const lessonTotal = database.lessons.length;
+  const completedLessonCount = database.progress.filter(
+    (item) => item.completed === true,
+  ).length;
+  const fraction =
+    lessonTotal === 0
+      ? 0
+      : Math.min(1, completedLessonCount / lessonTotal);
+  return { completedLessonCount, lessonTotal, fraction };
+}
+
 export async function saveConversationMessages(
   messages: ConversationMessage[],
 ): Promise<ConversationMessage[]> {

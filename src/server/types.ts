@@ -5,6 +5,25 @@ export type VocabularyItem = {
   english: string;
 };
 
+/** One screen in the in-app lesson flow (vocabulary → grammar → phrase, etc.). */
+export type LessonStepKind =
+  | "overview"
+  | "vocabulary"
+  | "grammar"
+  | "phrase"
+  | "practice";
+
+export type LessonStep = {
+  kind: LessonStepKind;
+  title: string;
+  body: string;
+  /** Vocabulary step: word list (may also mirror top-level lesson.vocabulary). */
+  words?: VocabularyItem[];
+  /** Grammar / phrase / practice: optional example line. */
+  spanish?: string;
+  english?: string;
+};
+
 export type Lesson = {
   id: string;
   title: string;
@@ -15,6 +34,8 @@ export type Lesson = {
   englishTranslation: string;
   vocabulary: VocabularyItem[];
   practiceQuestions: string[];
+  /** AI-generated multi-step path; absent on older saved lessons. */
+  steps?: LessonStep[];
   createdAt: string;
   source: "ollama" | "fallback";
 };

@@ -4,10 +4,22 @@ import type { Lesson } from "@/server/types";
 
 const FALLBACK_PROMPT = "Hola, ¿cómo estás?";
 
-function getPromptText(lesson: Lesson | null): string {
+function getPromptText(
+  lesson: Lesson | null,
+  textOverride: string | null | undefined,
+): string {
+  const override = textOverride?.trim();
+  if (override) {
+    return override;
+  }
   const trimmed = lesson?.spanishPrompt?.trim();
   return trimmed || FALLBACK_PROMPT;
 }
+
+export type UseSpanishPromptSpeechOptions = {
+  /** When set, read this instead of the lesson's spanishPrompt. */
+  textOverride?: string | null;
+};
 
 /**
  * Read aloud the lesson Spanish prompt (or fallback) using the browser
@@ -16,9 +28,10 @@ function getPromptText(lesson: Lesson | null): string {
 export function useSpanishPromptSpeech(
   lesson: Lesson | null,
   onError?: (message: string) => void,
+  options?: UseSpanishPromptSpeechOptions,
 ) {
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const promptText = getPromptText(lesson);
+  const promptText = getPromptText(lesson, options?.textOverride);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 

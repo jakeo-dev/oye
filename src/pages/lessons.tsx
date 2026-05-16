@@ -1,13 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faChevronLeft,
+  faChevronRight,
+  faMicrophone,
+  faPenToSquare,
+  faPills,
   faStop,
+  faTrain,
+  faUtensils,
   faVolume,
   faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
-import type { Lesson } from "@/server/types";
+import type { Lesson, LessonLevel, LessonStep } from "@/server/types";
 
+import { resolveLessonSteps } from "@/lib/lessonSteps";
 import { useSpanishPromptSpeech } from "@/hooks/useSpanishPromptSpeech";
 
 import { Host_Grotesk } from "next/font/google";
@@ -16,31 +24,152 @@ const hostGrotesk = Host_Grotesk({
   subsets: ["latin"],
 });
 
+type FlowPhase = "pick-context" | "custom-details" | "lesson";
+
+const CONTEXT_PRESETS = [
+  {
+    id: "restaurant",
+    label: "Ordering at a restaurant",
+    description: "Menus, allergies, paying the bill",
+    scenario:
+      "I'm ordering food and drinks at a sit-down restaurant near the beach in Spain as an English-speaking tourist.",
+    icon: faUtensils,
+  },
+  {
+    id: "train",
+    label: "Boarding a train",
+    description: "Tickets, platforms, and seats",
+    scenario:
+      "I'm boarding and riding a regional train in Spain: tickets, finding the platform, and simple questions on board.",
+    icon: faTrain,
+  },
+  {
+    id: "pharmacy",
+    label: "At the pharmacy",
+    description: "Basic health and supplies",
+    scenario:
+      "I'm visiting a Spanish pharmacy for minor travel needs: describing symptoms briefly and asking for common products.",
+    icon: faPills,
+  },
+  {
+    id: "custom",
+    label: "Custom situation",
+    description: "Describe your own scenario",
+    scenario: null,
+    icon: faPenToSquare,
+  },
+] as const;
+
+function stepKindLabel(kind: LessonStep["kind"]): string {
+  switch (kind) {
+    case "overview":
+      return "Overview";
+    case "vocabulary":
+      return "Vocabulary";
+    case "grammar":
+      return "Grammar";
+    case "phrase":
+      return "Phrase";
+    case "practice":
+      return "Practice";
+    default:
+      return "Step";
+  }
+}
+
+function speechTextForStep(step: LessonStep, lesson: Lesson): string {
+  const phrase = step.spanish?.trim();
+  if (phrase) {
+    return phrase;
+  }
+  if (step.kind === "vocabulary") {
+    const words = step.words?.length ? step.words : lesson.vocabulary;
+    if (words.length > 0) {
+      return words.map((w) => w.spanish).join(". ");
+    }
+  }
+  return lesson.spanishPrompt.trim() || "Hola, ¿cómo estás?";
+}
+
 export default function Lessons() {
+  const [phase, setPhase] = useState<FlowPhase>("pick-context");
   const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [scenario, setScenario] = useState("ordering food near the beach");
-  const [status, setStatus] = useState("Loading lesson...");
+  const [stepIndex, setStepIndex] = useState(0);
+  const [scenario, setScenario] = useState("");
+  const [level, setLevel] = useState<LessonLevel>("beginner");
+  const [status, setStatus] = useState("");
+  const [lastLessonId, setLastLessonId] = useState<string | null>(null);
+  const [stepSpeechText, setStepSpeechText] = useState("");
+  const [practiceHint, setPracticeHint] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const baseTextRef = useRef("");
+
+  const steps = useMemo(
+    () => (lesson ? resolveLessonSteps(lesson) : []),
+    [lesson],
+  );
+  const currentStep = steps[stepIndex] ?? null;
+
+  const speechOverride = useMemo(() => {
+    if (!lesson || !currentStep) {
+      return null;
+    }
+    return speechTextForStep(currentStep, lesson);
+  }, [lesson, currentStep]);
 
   const { toggleSpeakPrompt, isSpeaking: isSpeakingPrompt } =
-    useSpanishPromptSpeech(lesson, (message) => setStatus(message));
+    useSpanishPromptSpeech(lesson, (message) => setStatus(message), {
+      textOverride: speechOverride,
+    });
 
   useEffect(() => {
-    async function loadLesson() {
-      const response = await fetch("/api/lessons");
-      const data = (await response.json()) as { lessons: Lesson[] };
-      setLesson(data.lessons[0] ?? null);
-      setStatus(data.lessons[0] ? "" : "Generate a first lesson.");
+    async function peekLatestLesson() {
+      try {
+        const response = await fetch("/api/lessons");
+        const data = (await response.json()) as { lessons: Lesson[] };
+        const latest = data.lessons[0];
+        setLastLessonId(latest?.id ?? null);
+      } catch {
+        /* ignore */
+      }
     }
-
-    loadLesson().catch(() => setStatus("Could not load lessons."));
+    void peekLatestLesson();
   }, []);
 
-  async function generateLesson() {
+  /** Reset step when lesson identity changes */
+  useEffect(() => {
+    setStepIndex(0);
+  }, [lesson?.id]);
+
+  useEffect(() => {
+    setStepSpeechText("");
+    setPracticeHint("");
+  }, [stepIndex, lesson?.id]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  async function generateLesson(scenarioText: string) {
+    const trimmed = scenarioText.trim();
+    if (!trimmed) {
+      setStatus("Describe a situation first.");
+      return;
+    }
+
     setStatus("Generating with Ollama...");
     const response = await fetch("/api/lessons", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scenario, level: "beginner" }),
+      body: JSON.stringify({ scenario: trimmed, level }),
     });
     const data = (await response.json()) as { lesson?: Lesson; error?: string };
 
@@ -50,7 +179,182 @@ export default function Lessons() {
     }
 
     setLesson(data.lesson);
+    setPhase("lesson");
     setStatus("");
+    setLastLessonId(data.lesson.id);
+  }
+
+  async function continueLastLesson() {
+    setStatus("Loading lesson...");
+    try {
+      const response = await fetch("/api/lessons");
+      const data = (await response.json()) as { lessons: Lesson[] };
+      const latest = data.lessons[0];
+      if (!latest) {
+        setStatus("No saved lesson yet.");
+        return;
+      }
+      setLesson(latest);
+      setPhase("lesson");
+      setStatus("");
+    } catch {
+      setStatus("Could not load lessons.");
+    }
+  }
+
+  function startStepListening() {
+    const SpeechRecognitionCtor =
+      typeof window !== "undefined"
+        ? window.SpeechRecognition ?? window.webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognitionCtor) {
+      setPracticeHint(
+        "Speech recognition is not supported in this browser.",
+      );
+      return;
+    }
+
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+
+    baseTextRef.current = stepSpeechText;
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "es-ES";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: SpeechRecognitionResultListEvent) => {
+      let spoken = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const first = result?.[0];
+        if (first?.transcript?.length) {
+          spoken += first.transcript;
+        }
+      }
+      const spokenTrimmed = spoken.trim();
+      const prefix = baseTextRef.current.trim();
+      const merged =
+        prefix && spokenTrimmed
+          ? `${prefix} ${spokenTrimmed}`
+          : spokenTrimmed || prefix;
+      setStepSpeechText(merged);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      setIsListening(false);
+      recognitionRef.current = null;
+      const code = event.error ?? "unknown";
+      if (code === "aborted" || code === "no-speech") {
+        setPracticeHint("");
+        return;
+      }
+      if (code === "not-allowed") {
+        setPracticeHint(
+          "Microphone access denied. Allow the mic for this site and try again.",
+        );
+        return;
+      }
+      setPracticeHint(`Speech error: ${code}. Try again or type below.`);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+      setPracticeHint((current) =>
+        current === "Listening…" ? "" : current,
+      );
+    };
+
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+      setIsListening(true);
+      setPracticeHint("Listening…");
+    } catch {
+      setIsListening(false);
+      recognitionRef.current = null;
+      setPracticeHint(
+        "Could not start dictation. Try refreshing or type your answer.",
+      );
+    }
+  }
+
+  function stopStepListening() {
+    if (!recognitionRef.current || !isListening) {
+      return;
+    }
+    try {
+      recognitionRef.current.stop();
+    } catch {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      setIsListening(false);
+    }
+  }
+
+  function handleStepMicClick() {
+    if (isListening) {
+      stopStepListening();
+      return;
+    }
+    startStepListening();
+  }
+
+  const isLastStep = steps.length > 0 && stepIndex >= steps.length - 1;
+
+  async function finishLesson() {
+    if (!lesson) {
+      return;
+    }
+    setPracticeHint("");
+    setStatus("");
+    try {
+      const response = await fetch(
+        `/api/lessons/${encodeURIComponent(lesson.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ completed: true }),
+        },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setStatus(data.error ?? "Could not save lesson progress.");
+        return;
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("oye:progress-updated"));
+      }
+      newLessonFlow();
+    } catch {
+      setStatus("Could not save lesson progress.");
+    }
+  }
+
+  function newLessonFlow() {
+    setLesson(null);
+    setPhase("pick-context");
+    setStepIndex(0);
+    setScenario("");
+    setStatus("");
+    setStepSpeechText("");
+    setPracticeHint("");
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+    setIsListening(false);
   }
 
   return (
@@ -67,93 +371,412 @@ export default function Lessons() {
       />
 
       <div className="relative mx-auto flex w-full max-w-220 flex-col gap-6 px-8 py-12">
-        <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg shadow-black/25 ring-1 ring-white/5 backdrop-blur-sm sm:p-7">
-          <div
-            className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
-            aria-hidden
-          />
-          <p className="text-xs font-semibold tracking-[0.2em] text-orange-400/90 uppercase">
-            Lesson
-          </p>
-          <div className="mt-3 flex items-start gap-4">
-            <h1 className="min-w-0 flex-1 text-pretty text-2xl leading-tight font-black tracking-tight text-white sm:text-3xl md:text-4xl">
-              {lesson?.spanishPrompt ?? "Hola, ¿cómo estás?"}
-            </h1>
-            <button
-              type="button"
-              onClick={() => toggleSpeakPrompt()}
-              className={`shrink-0 flex h-11 w-11 items-center justify-center rounded-full border bg-stone-800/80 outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
-                isSpeakingPrompt
-                  ? "border-orange-400/50 text-orange-200 hover:border-orange-300/60 hover:bg-orange-400/15"
-                  : "border-stone-600/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
-              }`}
-              aria-label={
-                isSpeakingPrompt ? "Stop reading prompt" : "Read prompt aloud"
-              }
-            >
-              <FontAwesomeIcon
-                icon={isSpeakingPrompt ? faStop : faVolume}
-                className="text-lg"
+        {phase === "pick-context" ? (
+          <>
+            <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg shadow-black/25 ring-1 ring-white/5 backdrop-blur-sm sm:p-7">
+              <div
+                className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
+                aria-hidden
               />
-            </button>
-          </div>
-        </section>
+              <p className="text-xs font-semibold tracking-[0.2em] text-orange-400/90 uppercase">
+                Lessons
+              </p>
+              <h1 className="mt-3 text-pretty text-2xl leading-tight font-black tracking-tight text-white sm:text-3xl md:text-4xl">
+                Pick a real-life context
+              </h1>
+              <p className="mt-3 max-w-2xl text-pretty text-stone-400">
+                Choose where you’ll use Spanish. The app builds a short lesson—overview, vocabulary, grammar, a key phrase, and practice—using the same AI as the generate button.
+              </p>
 
-        <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-1 ring-white/5 sm:p-6">
-          <h2 className="text-sm font-semibold tracking-wide text-stone-400">
-            New lesson from scenario
-          </h2>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-stretch">
-            <input
-              value={scenario}
-              onChange={(event) => setScenario(event.target.value)}
-              className="min-h-12 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
-              placeholder="Describe a situation in English…"
-              aria-label="Lesson scenario"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                void generateLesson();
-              }}
-              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:px-8"
-            >
-              <FontAwesomeIcon icon={faWandMagicSparkles} className="text-sm" />
-              Generate
-            </button>
-          </div>
-          {status ? (
-            <p className="mt-3 text-sm text-stone-400" role="status">
-              {status}
-            </p>
-          ) : null}
-        </section>
+              <fieldset className="mt-6">
+                <legend className="text-xs font-semibold tracking-wide text-stone-500">
+                  Level
+                </legend>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                  {(
+                    [
+                      { id: "beginner", label: "Beginner" },
+                      { id: "upper-beginner", label: "Upper beginner" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setLevel(opt.id)}
+                      className={`rounded-full border px-4 py-2 text-sm font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 ${
+                        level === opt.id
+                          ? "border-orange-400/50 bg-orange-400/15 text-orange-100"
+                          : "border-stone-600 bg-stone-800/50 text-stone-300 hover:border-stone-500"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            </section>
 
-        {lesson ? (
-          <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-1 ring-white/5 sm:p-6">
-            <h2 className="text-xl font-black tracking-tight text-white sm:text-2xl">
-              {lesson.title}
-            </h2>
-            <p className="mt-2 text-pretty leading-relaxed text-stone-300">
-              {lesson.englishTranslation}
-            </p>
-            <h3 className="mt-6 text-xs font-semibold tracking-[0.18em] text-orange-400/90 uppercase">
-              Vocabulary
-            </h3>
-            <ul className="mt-3 divide-y divide-stone-700/80 rounded-xl border border-stone-700/60 bg-stone-950/40">
-              {lesson.vocabulary.map((item) => (
-                <li
-                  key={`${item.spanish}-${item.english}`}
-                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3.5 sm:px-5"
+            <div className="grid gap-4 sm:grid-cols-2">
+              {CONTEXT_PRESETS.map((ctx) => (
+                <button
+                  key={ctx.id}
+                  type="button"
+                  onClick={() => {
+                    if (ctx.scenario === null) {
+                      setPhase("custom-details");
+                      setScenario("");
+                      return;
+                    }
+                    void generateLesson(ctx.scenario);
+                  }}
+                  className="group flex flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg shadow-black/20 ring-1 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
                 >
-                  <span className="font-bold text-orange-100">{item.spanish}</span>
-                  <span className="text-right text-stone-400">{item.english}</span>
-                </li>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-400/12 text-orange-300 transition group-hover:bg-orange-400/20">
+                    <FontAwesomeIcon icon={ctx.icon} className="text-lg" />
+                  </span>
+                  <span className="mt-4 text-lg font-black text-white">
+                    {ctx.label}
+                  </span>
+                  <span className="mt-1 text-sm text-stone-400">
+                    {ctx.description}
+                  </span>
+                  <span className="mt-4 text-xs font-semibold text-orange-400/90 uppercase">
+                    {ctx.scenario === null
+                      ? "Describe your scenario"
+                      : "Generate lesson →"}
+                  </span>
+                </button>
               ))}
-            </ul>
+            </div>
+
+            {lastLessonId ? (
+              <p className="text-center text-sm text-stone-500">
+                Or{" "}
+                <button
+                  type="button"
+                  onClick={() => void continueLastLesson()}
+                  className="font-bold text-orange-400 underline-offset-2 hover:underline"
+                >
+                  open your most recent lesson
+                </button>
+                .
+              </p>
+            ) : null}
+
+            {status ? (
+              <p className="text-center text-sm text-stone-400" role="status">
+                {status}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+
+        {phase === "custom-details" ? (
+          <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-1 ring-white/5 sm:p-6">
+            <h2 className="text-sm font-semibold tracking-wide text-stone-400">
+              Custom scenario
+            </h2>
+            <p className="mt-2 text-sm text-stone-500">
+              Describe the situation in English. The model turns it into vocabulary, grammar notes, and a phrase you can practice.
+            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              <textarea
+                value={scenario}
+                onChange={(e) => setScenario(e.target.value)}
+                rows={4}
+                className="min-h-28 w-full resize-y rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                placeholder="e.g. Renting a bike and asking about helmets…"
+                aria-label="Custom lesson scenario"
+              />
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void generateLesson(scenario);
+                  }}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:px-8"
+                >
+                  <FontAwesomeIcon
+                    icon={faWandMagicSparkles}
+                    className="text-sm"
+                  />
+                  Generate lesson
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhase("pick-context");
+                    setStatus("");
+                  }}
+                  className="inline-flex h-12 items-center justify-center rounded-full border border-stone-600 px-6 text-sm font-bold text-stone-200 hover:bg-stone-800"
+                >
+                  Back to contexts
+                </button>
+              </div>
+            </div>
+            {status ? (
+              <p className="mt-3 text-sm text-stone-400" role="status">
+                {status}
+              </p>
+            ) : null}
           </section>
+        ) : null}
+
+        {phase === "lesson" && lesson ? (
+          <>
+            <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg shadow-black/25 ring-1 ring-white/5 backdrop-blur-sm sm:p-7">
+              <div
+                className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
+                aria-hidden
+              />
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold tracking-[0.2em] text-orange-400/90 uppercase">
+                    {lesson.title}
+                  </p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Context: {lesson.scenario}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={newLessonFlow}
+                  className="shrink-0 rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-300 hover:bg-stone-800"
+                >
+                  New context
+                </button>
+              </div>
+
+              <div className="mt-6">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-stone-500">
+                  <span>
+                    Step {stepIndex + 1} of {steps.length}
+                  </span>
+                  <span className="rounded-full bg-stone-800/80 px-2 py-0.5 font-semibold text-orange-200/90">
+                    {currentStep
+                      ? stepKindLabel(currentStep.kind)
+                      : "Step"}
+                  </span>
+                </div>
+                <div
+                  className="mt-3 flex h-1.5 gap-1"
+                  role="progressbar"
+                  aria-valuenow={stepIndex + 1}
+                  aria-valuemin={1}
+                  aria-valuemax={steps.length}
+                >
+                  {steps.map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-full min-w-6 flex-1 rounded-full transition ${
+                        i <= stepIndex
+                          ? "bg-orange-400/70"
+                          : "bg-stone-700/80"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {currentStep ? (
+                <div className="mt-6">
+                  <h2 className="text-xl font-black tracking-tight text-white sm:text-2xl">
+                    {currentStep.title}
+                  </h2>
+                  {currentStep.body ? (
+                    <p className="mt-3 text-pretty leading-relaxed whitespace-pre-line text-stone-300">
+                      {currentStep.body}
+                    </p>
+                  ) : null}
+
+                  {(currentStep.spanish || currentStep.english) ? (
+                    <div className="mt-5 flex flex-col gap-2 rounded-xl border border-stone-700/60 bg-stone-950/40 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      {currentStep.spanish ? (
+                        <p className="text-lg font-bold text-orange-100">
+                          {currentStep.spanish}
+                        </p>
+                      ) : null}
+                      {currentStep.english ? (
+                        <p className="text-sm text-stone-400 sm:text-right">
+                          {currentStep.english}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {currentStep.words && currentStep.words.length > 0 ? (
+                    <ul className="mt-5 divide-y divide-stone-700/80 rounded-xl border border-stone-700/60 bg-stone-950/40">
+                      {currentStep.words.map((item) => (
+                        <li
+                          key={`${item.spanish}-${item.english}`}
+                          className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3.5 sm:px-5"
+                        >
+                          <span className="font-bold text-orange-100">
+                            {item.spanish}
+                          </span>
+                          <span className="text-right text-stone-400">
+                            {item.english}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleSpeakPrompt()}
+                      className={`flex h-11 w-11 items-center justify-center rounded-full border bg-stone-800/80 outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
+                        isSpeakingPrompt
+                          ? "border-orange-400/50 text-orange-200 hover:border-orange-300/60 hover:bg-orange-400/15"
+                          : "border-stone-600/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
+                      }`}
+                      aria-label={
+                        isSpeakingPrompt
+                          ? "Stop reading aloud"
+                          : "Read aloud"
+                      }
+                    >
+                      <FontAwesomeIcon
+                        icon={isSpeakingPrompt ? faStop : faVolume}
+                        className="text-lg"
+                      />
+                    </button>
+                    <p className="text-xs text-stone-500">
+                      Plays Spanish for this step when available.
+                    </p>
+                  </div>
+
+                  <div className="mt-8 rounded-xl border border-stone-700/60 bg-stone-950/35 p-4 sm:p-5">
+                    <h3 className="text-xs font-semibold tracking-[0.15em] text-orange-400/90 uppercase">
+                      Your turn — say it
+                    </h3>
+                    <p className="mt-2 text-sm text-stone-400">
+                      Use the microphone or type. Try the Spanish words or sentences from this step.
+                    </p>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                      <button
+                        type="button"
+                        onClick={handleStepMicClick}
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
+                          isListening
+                            ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
+                            : "border-stone-600/80 bg-stone-800/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
+                        }`}
+                        aria-label={
+                          isListening ? "Stop recording" : "Speak in Spanish"
+                        }
+                      >
+                        <FontAwesomeIcon
+                          icon={faMicrophone}
+                          className="text-lg"
+                        />
+                      </button>
+                      <input
+                        value={stepSpeechText}
+                        onChange={(e) => setStepSpeechText(e.target.value)}
+                        className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-2.5 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                        placeholder="What you said appears here…"
+                        aria-label="Transcript of your Spanish practice"
+                      />
+                    </div>
+                    {practiceHint ? (
+                      <p className="mt-3 text-xs text-stone-500" role="status">
+                        {practiceHint}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-stone-700/60 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+                  disabled={stepIndex === 0}
+                  className="inline-flex items-center gap-2 rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isLastStep) {
+                      void finishLesson();
+                    } else {
+                      setStepIndex((i) => Math.min(steps.length - 1, i + 1));
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 shadow-lg shadow-orange-500/15 transition hover:bg-orange-300"
+                >
+                  {isLastStep ? "Finish" : "Next"}
+                  {isLastStep ? null : (
+                    <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+                  )}
+                </button>
+              </div>
+            </section>
+
+            {lesson.practiceQuestions.length > 0 &&
+            currentStep?.kind === "practice" ? (
+              <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-1 ring-white/5 sm:p-6">
+                <h3 className="text-xs font-semibold tracking-[0.18em] text-orange-400/90 uppercase">
+                  Extra prompts
+                </h3>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-stone-300">
+                  {lesson.practiceQuestions.map((q) => (
+                    <li key={q} className="text-pretty">
+                      {q}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </>
         ) : null}
       </div>
     </div>
   );
+}
+
+type SpeechRecognitionAlternative = {
+  transcript: string;
+};
+
+type SpeechRecognitionResult = ArrayLike<SpeechRecognitionAlternative> & {
+  length: number;
+  isFinal: boolean;
+};
+
+type SpeechRecognitionResultListEvent = {
+  results: ArrayLike<SpeechRecognitionResult> & {
+    length: number;
+    item?: (index: number) => SpeechRecognitionResult | null;
+    [index: number]: SpeechRecognitionResult;
+  };
+};
+
+type SpeechRecognitionErrorEvent = {
+  error?: string;
+};
+
+type SpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionResultListEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognition;
+    webkitSpeechRecognition?: new () => SpeechRecognition;
+  }
 }

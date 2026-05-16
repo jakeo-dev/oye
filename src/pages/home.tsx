@@ -28,7 +28,7 @@ function NavCard({
   return (
     <Link
       href={href}
-      className="group relative flex gap-5 rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 outline-none ring-orange-400/0 transition hover:border-orange-400/35 hover:bg-stone-900/70 hover:shadow-orange-950/20 focus-visible:ring-2 focus-visible:ring-orange-400/80 md:p-6"
+      className="group relative flex gap-5 rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-orange-400/0 transition outline-none hover:border-orange-400/35 hover:bg-stone-900/70 hover:shadow-orange-950/20 focus-visible:ring-2 focus-visible:ring-orange-400/80 md:p-6"
     >
       <span
         className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400 transition group-hover:bg-orange-400/25 group-hover:text-orange-300"
@@ -47,7 +47,7 @@ function NavCard({
             </span>
           </span>
           <span
-            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-600/80 bg-stone-800/80 text-stone-300 transition group-hover:border-orange-400/40 group-hover:bg-orange-400/10 group-hover:text-orange-300 group-hover:translate-x-0.5"
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-600/80 bg-stone-800/80 text-stone-300 transition group-hover:translate-x-0.5 group-hover:border-orange-400/40 group-hover:bg-orange-400/10 group-hover:text-orange-300"
             aria-hidden
           >
             <FontAwesomeIcon icon={faArrowRight} className="text-sm" />
@@ -68,7 +68,7 @@ export default function Home() {
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -bottom-40 -right-24 h-80 w-80 rounded-full bg-orange-600/10 blur-3xl"
+        className="pointer-events-none absolute -right-24 -bottom-40 h-80 w-80 rounded-full bg-orange-600/10 blur-3xl"
         aria-hidden
       />
       <div
@@ -79,13 +79,10 @@ export default function Home() {
       <div className="relative mx-auto flex w-full max-w-220 flex-col gap-12 px-8 py-12 lg:flex-row lg:items-center lg:gap-16">
         <div className="flex min-w-0 flex-1 flex-col gap-8 lg:max-w-xl">
           <header className="space-y-3">
-            <p className="text-sm font-semibold tracking-wide text-orange-400/90 uppercase">
-              ¡Oye!
-            </p>
-            <h1 className="text-pretty text-4xl font-black leading-[1.1] tracking-tight text-white sm:text-5xl">
+            <h1 className="text-4xl leading-[1.1] font-black tracking-tight text-pretty text-white sm:text-5xl">
               Pick up where you left off
             </h1>
-            <p className="max-w-md text-pretty text-base leading-relaxed text-stone-400 sm:text-lg">
+            <p className="max-w-md text-base leading-relaxed text-pretty text-stone-400 sm:text-lg">
               Structured lessons and open conversation practice — use whichever
               fits your mood today.
             </p>
@@ -115,7 +112,7 @@ export default function Home() {
             className="absolute inset-6 -z-10 rounded-[2.5rem] bg-linear-to-br from-orange-500/25 via-stone-800/40 to-stone-950 blur-2xl"
             aria-hidden
           />
-          <div className="relative w-full rounded-4xl border border-stone-700/60 bg-linear-to-b from-stone-900/80 to-stone-950/90 p-6 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-sm sm:p-8">
+          <div className="relative w-full rounded-4xl border border-stone-700/60 bg-linear-to-b from-stone-900/80 to-stone-950/90 p-6 shadow-2xl ring-1 shadow-black/50 ring-white/5 backdrop-blur-sm sm:p-8">
             <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent" />
             <Image
               src="/mascot.png"

@@ -19,13 +19,42 @@ const hostGrotesk = Host_Grotesk({
   subsets: ["latin"],
 });
 
+function ChatTypingIndicator() {
+  return (
+    <div
+      className="max-w-[min(100%,28rem)] self-start rounded-2xl border border-stone-600/80 bg-stone-800/70 px-5 py-3.5"
+      role="status"
+      aria-label="Assistant is typing"
+    >
+      <span className="inline-flex items-center gap-1.5" aria-hidden>
+        <span
+          className="inline-block h-2 w-2 rounded-full bg-orange-300/90 motion-safe:animate-bounce"
+          style={{ animationDuration: "0.9s", animationDelay: "0ms" }}
+        />
+        <span
+          className="inline-block h-2 w-2 rounded-full bg-orange-300/90 motion-safe:animate-bounce"
+          style={{ animationDuration: "0.9s", animationDelay: "150ms" }}
+        />
+        <span
+          className="inline-block h-2 w-2 rounded-full bg-orange-300/90 motion-safe:animate-bounce"
+          style={{ animationDuration: "0.9s", animationDelay: "300ms" }}
+        />
+      </span>
+    </div>
+  );
+}
+
+const OPTIMISTIC_USER_PREFIX = "optimistic-user-";
+
 export default function Conversation() {
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [userText, setUserText] = useState("");
   const [status, setStatus] = useState("");
+  const [isAwaitingReply, setIsAwaitingReply] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
   /** Typed text before mic session; transcripts are appended to this string. */
   const baseTextRef = useRef("");
 
@@ -58,33 +87,57 @@ export default function Conversation() {
     };
   }, []);
 
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isAwaitingReply]);
+
   async function sendMessage() {
     const trimmedText = userText.trim();
     if (!trimmedText) {
       return;
     }
 
-    setStatus("Thinking...");
-    const response = await fetch("/api/conversation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lessonId: lesson?.id, userText: trimmedText }),
-    });
-    const data = (await response.json()) as {
-      messages?: ConversationMessage[];
-      error?: string;
+    const optimisticMessage: ConversationMessage = {
+      id: `${OPTIMISTIC_USER_PREFIX}${Date.now()}`,
+      lessonId: lesson?.id ?? null,
+      role: "user",
+      content: trimmedText,
+      createdAt: new Date().toISOString(),
     };
 
-    const newMessages = data.messages;
-
-    if (!response.ok || !newMessages) {
-      setStatus(data.error ?? "Could not get a reply.");
-      return;
-    }
-
-    setMessages((current) => [...current, ...newMessages]);
+    setMessages((current) => [...current, optimisticMessage]);
     setUserText("");
+    setIsAwaitingReply(true);
     setStatus("");
+    try {
+      const response = await fetch("/api/conversation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessonId: lesson?.id, userText: trimmedText }),
+      });
+      const data = (await response.json()) as {
+        messages?: ConversationMessage[];
+        error?: string;
+      };
+
+      const newMessages = data.messages;
+
+      if (!response.ok || !newMessages) {
+        setMessages((current) =>
+          current.filter((m) => !m.id.startsWith(OPTIMISTIC_USER_PREFIX)),
+        );
+        setStatus(data.error ?? "Could not get a reply.");
+        return;
+      }
+
+      setMessages((current) => [
+        ...current.filter((m) => !m.id.startsWith(OPTIMISTIC_USER_PREFIX)),
+        ...newMessages,
+      ]);
+      setStatus("");
+    } finally {
+      setIsAwaitingReply(false);
+    }
   }
 
   async function clearConversation() {
@@ -262,7 +315,7 @@ export default function Conversation() {
               onClick={() => {
                 void clearConversation();
               }}
-              disabled={messages.length === 0}
+              disabled={messages.length === 0 || isAwaitingReply}
               aria-label="Clear conversation"
               className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-sm font-bold text-stone-100 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
             >
@@ -277,7 +330,7 @@ export default function Conversation() {
             aria-live="polite"
             aria-relevant="additions"
           >
-            {messages.length === 0 ? (
+            {messages.length === 0 && !isAwaitingReply ? (
               <p className="text-center text-sm text-stone-500">
                 Say hello below — your thread appears here.
               </p>
@@ -285,7 +338,7 @@ export default function Conversation() {
             {messages.map((message) => (
               <p
                 key={message.id}
-                className={`max-w-[min(100%,28rem)] text-pretty rounded-2xl px-4 py-3 text-base leading-relaxed sm:px-5 ${
+                className={`max-w-[min(100%,28rem)] text-pretty rounded-2xl px-4 py-3 text-base text-left leading-relaxed sm:px-5 ${
                   message.role === "user"
                     ? "ml-auto border border-orange-400/35 bg-orange-400/15 font-medium text-stone-100"
                     : "border border-stone-600/80 bg-stone-800/70 text-stone-200"
@@ -294,13 +347,16 @@ export default function Conversation() {
                 {message.content}
               </p>
             ))}
+            {isAwaitingReply ? <ChatTypingIndicator /> : null}
+            <div ref={logEndRef} className="h-0 shrink-0" aria-hidden />
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
             <button
               type="button"
               onClick={handleMicClick}
-              className={`flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
+              disabled={isAwaitingReply}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:self-auto ${
                 isListening
                   ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
                   : "border-stone-600/80 bg-stone-800/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
@@ -313,11 +369,12 @@ export default function Conversation() {
               value={userText}
               onChange={(event) => setUserText(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
+                if (event.key === "Enter" && !isAwaitingReply) {
                   void sendMessage();
                 }
               }}
-              className="min-h-12 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+              disabled={isAwaitingReply}
+              className="min-h-12 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:cursor-not-allowed disabled:opacity-45"
               placeholder="Type in Spanish…"
               aria-label="Conversation reply"
             />
@@ -326,12 +383,13 @@ export default function Conversation() {
               onClick={() => {
                 void sendMessage();
               }}
-              className="h-12 shrink-0 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:px-8"
+              disabled={isAwaitingReply}
+              className="h-12 shrink-0 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-8"
             >
               Send
             </button>
           </div>
-          {status ? (
+          {status && !isAwaitingReply ? (
             <p className="text-sm text-stone-400" role="status">
               {status}
             </p>

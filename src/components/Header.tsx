@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 
@@ -18,7 +19,6 @@ const iconButtonClassName =
 type AppHeaderProps = {
   showBackButton?: boolean;
   showProgressBar?: boolean;
-  progressValue?: number;
 };
 
 function IconButton({
@@ -61,9 +61,42 @@ function ExternalIconButton({
 
 export default function Header({
   showProgressBar = false,
-  progressValue = 0.7,
 }: AppHeaderProps) {
   const router = useRouter();
+  const [progressFraction, setProgressFraction] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProgress() {
+      try {
+        const response = await fetch("/api/progress");
+        const data = (await response.json()) as { fraction?: number };
+        if (
+          !cancelled &&
+          typeof data.fraction === "number" &&
+          !Number.isNaN(data.fraction)
+        ) {
+          setProgressFraction(Math.max(0, Math.min(1, data.fraction)));
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    void loadProgress();
+
+    function onProgressUpdated() {
+      void loadProgress();
+    }
+
+    window.addEventListener("oye:progress-updated", onProgressUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("oye:progress-updated", onProgressUpdated);
+    };
+  }, [router.asPath]);
+
   const githubHref =
     process.env.NEXT_PUBLIC_GITHUB_URL?.trim() ||
     "https://github.com/jakeo-dev/oye";
@@ -90,7 +123,8 @@ export default function Header({
           <div className="mx-1 flex h-2.5 min-w-0 flex-1 items-center rounded-full bg-stone-800 ring-1 ring-stone-700/60 sm:mx-2">
             <progress
               className="win-rate-bar-orange win-rate-bar-rounded mx-auto h-full w-full appearance-none overflow-hidden rounded-full bg-transparent"
-              value={progressValue}
+              max={1}
+              value={progressFraction}
             />
           </div>
         )}
