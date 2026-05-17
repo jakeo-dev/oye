@@ -33,7 +33,10 @@ export function useSpanishPromptSpeech(
   const [isSpeaking, setIsSpeaking] = useState(false);
   const promptText = getPromptText(lesson, options?.textOverride);
   const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     return () => {
@@ -48,7 +51,8 @@ export function useSpanishPromptSpeech(
       return;
     }
     window.speechSynthesis.cancel();
-    setIsSpeaking(false);
+    const timeoutId = window.setTimeout(() => setIsSpeaking(false), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [promptText]);
 
   const toggleSpeakPrompt = useCallback(() => {

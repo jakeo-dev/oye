@@ -3,9 +3,12 @@ import path from "node:path";
 
 import type {
   AppDatabase,
+  AppSettings,
   ConversationMessage,
+  DailyProgress,
   Lesson,
   LessonProgress,
+  PracticeAttempt,
 } from "./types";
 
 const databasePath =
@@ -15,12 +18,31 @@ const emptyDatabase = (): AppDatabase => ({
   lessons: [],
   progress: [],
   conversationMessages: [],
+  practiceAttempts: [],
+  dailyProgress: [],
+  settings: defaultSettings(),
 });
+
+function defaultSettings(): AppSettings {
+  return {
+    soundEnabled: true,
+    remindersEnabled: false,
+    dailyGoalMinutes: 10,
+    reminderTime: "18:00",
+    ollamaBaseUrl: null,
+    ollamaModel: null,
+  };
+}
 
 async function readDatabase(): Promise<AppDatabase> {
   try {
     const file = await readFile(databasePath, "utf8");
-    return { ...emptyDatabase(), ...JSON.parse(file) };
+    const parsed = JSON.parse(file) as Partial<AppDatabase>;
+    return {
+      ...emptyDatabase(),
+      ...parsed,
+      settings: { ...defaultSettings(), ...parsed.settings },
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return emptyDatabase();
@@ -61,6 +83,7 @@ export async function upsertProgress(
 ): Promise<LessonProgress> {
   const database = await readDatabase();
   const existing = database.progress.find((item) => item.lessonId === lessonId);
+  const completedNow = changes.completed === true && existing?.completed !== true;
   const progress: LessonProgress = {
     lessonId,
     completed: changes.completed ?? existing?.completed ?? false,
@@ -73,6 +96,12 @@ export async function upsertProgress(
     progress,
     ...database.progress.filter((item) => item.lessonId !== lessonId),
   ];
+  if (completedNow) {
+    incrementDailyProgress(database, {
+      minutes: 3,
+      lessonCompletions: 1,
+    });
+  }
   await writeDatabase(database);
   return progress;
 }
@@ -88,6 +117,10 @@ export async function getProgressSummary(): Promise<{
   completedLessonCount: number;
   lessonTotal: number;
   fraction: number;
+  today: DailyProgress;
+  dailyGoalMinutes: number;
+  dailyFraction: number;
+  streakDays: number;
 }> {
   const database = await readDatabase();
   const lessonTotal = database.lessons.length;
@@ -98,7 +131,19 @@ export async function getProgressSummary(): Promise<{
     lessonTotal === 0
       ? 0
       : Math.min(1, completedLessonCount / lessonTotal);
-  return { completedLessonCount, lessonTotal, fraction };
+  const today = getDailyProgressForDate(database, todayKey());
+  const dailyGoalMinutes = database.settings.dailyGoalMinutes;
+  const dailyFraction =
+    dailyGoalMinutes <= 0 ? 0 : Math.min(1, today.minutes / dailyGoalMinutes);
+  return {
+    completedLessonCount,
+    lessonTotal,
+    fraction,
+    today,
+    dailyGoalMinutes,
+    dailyFraction,
+    streakDays: getStreakDays(database.dailyProgress),
+  };
 }
 
 export async function saveConversationMessages(
@@ -132,4 +177,145 @@ export async function listConversationMessages(
   return database.conversationMessages.filter(
     (message) => lessonId === undefined || message.lessonId === lessonId,
   );
+}
+
+export async function getSettings(): Promise<AppSettings> {
+  const database = await readDatabase();
+  return database.settings;
+}
+
+export async function updateSettings(
+  changes: Partial<AppSettings>,
+): Promise<AppSettings> {
+  const database = await readDatabase();
+  database.settings = {
+    ...database.settings,
+    ...normalizeSettings(changes),
+  };
+  await writeDatabase(database);
+  return database.settings;
+}
+
+export async function savePracticeAttempt(
+  attempt: PracticeAttempt,
+): Promise<PracticeAttempt> {
+  const database = await readDatabase();
+  database.practiceAttempts = [attempt, ...database.practiceAttempts];
+  const existing = database.progress.find(
+    (item) => item.lessonId === attempt.lessonId,
+  );
+  database.progress = [
+    {
+      lessonId: attempt.lessonId,
+      completed: existing?.completed ?? false,
+      attempts: (existing?.attempts ?? 0) + 1,
+      lastScore: attempt.score,
+      updatedAt: new Date().toISOString(),
+    },
+    ...database.progress.filter((item) => item.lessonId !== attempt.lessonId),
+  ];
+  incrementDailyProgress(database, {
+    minutes: 1,
+    practiceAttempts: 1,
+  });
+  await writeDatabase(database);
+  return attempt;
+}
+
+export async function listPracticeAttempts(
+  lessonId?: string,
+): Promise<PracticeAttempt[]> {
+  const database = await readDatabase();
+  return database.practiceAttempts.filter(
+    (attempt) => lessonId === undefined || attempt.lessonId === lessonId,
+  );
+}
+
+export async function recordActivity(
+  changes: Partial<Omit<DailyProgress, "date">>,
+): Promise<DailyProgress> {
+  const database = await readDatabase();
+  const today = incrementDailyProgress(database, changes);
+  await writeDatabase(database);
+  return today;
+}
+
+function normalizeSettings(changes: Partial<AppSettings>): Partial<AppSettings> {
+  const next: Partial<AppSettings> = {};
+  if (typeof changes.soundEnabled === "boolean") {
+    next.soundEnabled = changes.soundEnabled;
+  }
+  if (typeof changes.remindersEnabled === "boolean") {
+    next.remindersEnabled = changes.remindersEnabled;
+  }
+  if (typeof changes.dailyGoalMinutes === "number") {
+    next.dailyGoalMinutes = Math.max(1, Math.min(240, changes.dailyGoalMinutes));
+  }
+  if (
+    typeof changes.reminderTime === "string" &&
+    /^\d{2}:\d{2}$/.test(changes.reminderTime)
+  ) {
+    next.reminderTime = changes.reminderTime;
+  }
+  if (changes.ollamaBaseUrl === null || typeof changes.ollamaBaseUrl === "string") {
+    next.ollamaBaseUrl = changes.ollamaBaseUrl?.trim() || null;
+  }
+  if (changes.ollamaModel === null || typeof changes.ollamaModel === "string") {
+    next.ollamaModel = changes.ollamaModel?.trim() || null;
+  }
+  return next;
+}
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getDailyProgressForDate(
+  database: AppDatabase,
+  date: string,
+): DailyProgress {
+  return (
+    database.dailyProgress.find((item) => item.date === date) ?? {
+      date,
+      minutes: 0,
+      lessonCompletions: 0,
+      conversationMessages: 0,
+      practiceAttempts: 0,
+    }
+  );
+}
+
+function incrementDailyProgress(
+  database: AppDatabase,
+  changes: Partial<Omit<DailyProgress, "date">>,
+): DailyProgress {
+  const date = todayKey();
+  const existing = getDailyProgressForDate(database, date);
+  const next: DailyProgress = {
+    date,
+    minutes: Math.max(0, existing.minutes + (changes.minutes ?? 0)),
+    lessonCompletions:
+      existing.lessonCompletions + (changes.lessonCompletions ?? 0),
+    conversationMessages:
+      existing.conversationMessages + (changes.conversationMessages ?? 0),
+    practiceAttempts: existing.practiceAttempts + (changes.practiceAttempts ?? 0),
+  };
+  database.dailyProgress = [
+    next,
+    ...database.dailyProgress.filter((item) => item.date !== date),
+  ];
+  return next;
+}
+
+function getStreakDays(progress: DailyProgress[]): number {
+  const activeDates = new Set(
+    progress.filter((item) => item.minutes > 0).map((item) => item.date),
+  );
+  let streak = 0;
+  const cursor = new Date(`${todayKey()}T00:00:00.000Z`);
+  while (activeDates.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  return streak;
 }

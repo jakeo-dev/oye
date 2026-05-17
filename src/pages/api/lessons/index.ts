@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import { listLessons, saveLesson } from "@/server/database";
+import { getSettings, listLessons, saveLesson } from "@/server/database";
 import {
   generateFallbackLesson,
   generateLessonWithOllama,
@@ -29,11 +29,12 @@ export default async function handler(
     };
 
     try {
+      const settings = await getSettings();
       const lesson = body.useFallback
         ? generateFallbackLesson(body)
         : await generateLessonWithOllama(body, {
-            baseUrl: body.ollamaBaseUrl,
-            model: body.ollamaModel,
+            baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
+            model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
           });
 
       await saveLesson(lesson);
@@ -52,4 +53,3 @@ export default async function handler(
   res.setHeader("Allow", "GET, POST");
   res.status(405).json({ error: "Method not allowed." } satisfies ErrorResponse);
 }
-

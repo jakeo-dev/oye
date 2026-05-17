@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronLeft,
   faChevronRight,
+  faCheck,
   faMicrophone,
   faPenToSquare,
   faPills,
@@ -13,9 +14,16 @@ import {
   faVolume,
   faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
-import type { Lesson, LessonLevel, LessonStep } from "@/server/types";
+import type {
+  Lesson,
+  LessonLevel,
+  LessonStep,
+  PracticeAttempt,
+} from "@/server/types";
 
 import { resolveLessonSteps } from "@/lib/lessonSteps";
+import { useSoundEffect } from "@/hooks/useSoundEffect";
+import { useSpanishDictation } from "@/hooks/useSpanishDictation";
 import { useSpanishPromptSpeech } from "@/hooks/useSpanishPromptSpeech";
 
 import { Host_Grotesk } from "next/font/google";
@@ -101,9 +109,10 @@ export default function Lessons() {
   const [lastLessonId, setLastLessonId] = useState<string | null>(null);
   const [stepSpeechText, setStepSpeechText] = useState("");
   const [practiceHint, setPracticeHint] = useState("");
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const baseTextRef = useRef("");
+  const [lastPracticeAttempt, setLastPracticeAttempt] =
+    useState<PracticeAttempt | null>(null);
+  const [isSavingPractice, setIsSavingPractice] = useState(false);
+  const playSound = useSoundEffect();
 
   const steps = useMemo(
     () => (lesson ? resolveLessonSteps(lesson) : []),
@@ -122,6 +131,20 @@ export default function Lessons() {
     useSpanishPromptSpeech(lesson, (message) => setStatus(message), {
       textOverride: speechOverride,
     });
+  const { isListening, toggleListening, stopListening } = useSpanishDictation({
+    value: stepSpeechText,
+    onChange: setStepSpeechText,
+    onStatus: setPracticeHint,
+    messages: {
+      listening: "Listening...",
+      unsupported: "Speech recognition is not supported in this browser.",
+      denied:
+        "Microphone access denied. Allow the mic for this site and try again.",
+      startError:
+        "Could not start dictation. Try refreshing or type your answer.",
+      genericError: (code) => `Speech error: ${code}. Try again or type below.`,
+    },
+  });
 
   useEffect(() => {
     async function peekLatestLesson() {
@@ -137,26 +160,12 @@ export default function Lessons() {
     void peekLatestLesson();
   }, []);
 
-  /** Reset step when lesson identity changes */
-  useEffect(() => {
-    setStepIndex(0);
-  }, [lesson?.id]);
-
-  useEffect(() => {
+  function resetStepPractice() {
+    stopListening();
     setStepSpeechText("");
     setPracticeHint("");
-  }, [stepIndex, lesson?.id]);
-
-  useEffect(() => {
-    return () => {
-      try {
-        recognitionRef.current?.abort();
-      } catch {
-        /* ignore */
-      }
-      recognitionRef.current = null;
-    };
-  }, []);
+    setLastPracticeAttempt(null);
+  }
 
   async function generateLesson(scenarioText: string) {
     const trimmed = scenarioText.trim();
@@ -179,6 +188,8 @@ export default function Lessons() {
     }
 
     setLesson(data.lesson);
+    setStepIndex(0);
+    resetStepPractice();
     setPhase("lesson");
     setStatus("");
     setLastLessonId(data.lesson.id);
@@ -195,118 +206,13 @@ export default function Lessons() {
         return;
       }
       setLesson(latest);
+      setStepIndex(0);
+      resetStepPractice();
       setPhase("lesson");
       setStatus("");
     } catch {
       setStatus("Could not load lessons.");
     }
-  }
-
-  function startStepListening() {
-    const SpeechRecognitionCtor =
-      typeof window !== "undefined"
-        ? window.SpeechRecognition ?? window.webkitSpeechRecognition
-        : null;
-
-    if (!SpeechRecognitionCtor) {
-      setPracticeHint(
-        "Speech recognition is not supported in this browser.",
-      );
-      return;
-    }
-
-    try {
-      recognitionRef.current?.abort();
-    } catch {
-      /* ignore */
-    }
-    recognitionRef.current = null;
-
-    baseTextRef.current = stepSpeechText;
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = "es-ES";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (event: SpeechRecognitionResultListEvent) => {
-      let spoken = "";
-      for (let i = 0; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const first = result?.[0];
-        if (first?.transcript?.length) {
-          spoken += first.transcript;
-        }
-      }
-      const spokenTrimmed = spoken.trim();
-      const prefix = baseTextRef.current.trim();
-      const merged =
-        prefix && spokenTrimmed
-          ? `${prefix} ${spokenTrimmed}`
-          : spokenTrimmed || prefix;
-      setStepSpeechText(merged);
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      setIsListening(false);
-      recognitionRef.current = null;
-      const code = event.error ?? "unknown";
-      if (code === "aborted" || code === "no-speech") {
-        setPracticeHint("");
-        return;
-      }
-      if (code === "not-allowed") {
-        setPracticeHint(
-          "Microphone access denied. Allow the mic for this site and try again.",
-        );
-        return;
-      }
-      setPracticeHint(`Speech error: ${code}. Try again or type below.`);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      recognitionRef.current = null;
-      setPracticeHint((current) =>
-        current === "Listening…" ? "" : current,
-      );
-    };
-
-    recognitionRef.current = recognition;
-
-    try {
-      recognition.start();
-      setIsListening(true);
-      setPracticeHint("Listening…");
-    } catch {
-      setIsListening(false);
-      recognitionRef.current = null;
-      setPracticeHint(
-        "Could not start dictation. Try refreshing or type your answer.",
-      );
-    }
-  }
-
-  function stopStepListening() {
-    if (!recognitionRef.current || !isListening) {
-      return;
-    }
-    try {
-      recognitionRef.current.stop();
-    } catch {
-      recognitionRef.current?.abort();
-      recognitionRef.current = null;
-      setIsListening(false);
-    }
-  }
-
-  function handleStepMicClick() {
-    if (isListening) {
-      stopStepListening();
-      return;
-    }
-    startStepListening();
   }
 
   const isLastStep = steps.length > 0 && stepIndex >= steps.length - 1;
@@ -334,9 +240,48 @@ export default function Lessons() {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("oye:progress-updated"));
       }
+      playSound("success");
       newLessonFlow();
     } catch {
       setStatus("Could not save lesson progress.");
+    }
+  }
+
+  async function saveStepPractice() {
+    const transcript = stepSpeechText.trim();
+    if (!lesson || !transcript) {
+      setPracticeHint("Say or type your answer first.");
+      return;
+    }
+
+    stopListening();
+    setIsSavingPractice(true);
+    setPracticeHint("Checking practice...");
+    try {
+      const response = await fetch(
+        `/api/lessons/${encodeURIComponent(lesson.id)}/practice`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stepIndex, transcript }),
+        },
+      );
+      const data = (await response.json()) as {
+        attempt?: PracticeAttempt;
+        error?: string;
+      };
+      if (!response.ok || !data.attempt) {
+        setPracticeHint(data.error ?? "Could not save practice.");
+        return;
+      }
+      setLastPracticeAttempt(data.attempt);
+      setPracticeHint(data.attempt.feedback);
+      window.dispatchEvent(new Event("oye:progress-updated"));
+      playSound("success");
+    } catch {
+      setPracticeHint("Could not save practice.");
+    } finally {
+      setIsSavingPractice(false);
     }
   }
 
@@ -348,13 +293,7 @@ export default function Lessons() {
     setStatus("");
     setStepSpeechText("");
     setPracticeHint("");
-    try {
-      recognitionRef.current?.abort();
-    } catch {
-      /* ignore */
-    }
-    recognitionRef.current = null;
-    setIsListening(false);
+    stopListening();
   }
 
   return (
@@ -657,7 +596,7 @@ export default function Lessons() {
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-stretch">
                       <button
                         type="button"
-                        onClick={handleStepMicClick}
+                        onClick={toggleListening}
                         className={`flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
                           isListening
                             ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
@@ -674,12 +613,29 @@ export default function Lessons() {
                       </button>
                       <input
                         value={stepSpeechText}
-                        onChange={(e) => setStepSpeechText(e.target.value)}
+                        onChange={(e) => {
+                          setStepSpeechText(e.target.value);
+                          setLastPracticeAttempt(null);
+                        }}
                         className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-2.5 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
                         placeholder="What you said appears here…"
                         aria-label="Transcript of your Spanish practice"
                       />
+                      <button
+                        type="button"
+                        onClick={() => void saveStepPractice()}
+                        disabled={isSavingPractice}
+                        className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-orange-400 px-5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <FontAwesomeIcon icon={faCheck} className="text-sm" />
+                        Check
+                      </button>
                     </div>
+                    {lastPracticeAttempt ? (
+                      <div className="mt-3 rounded-xl border border-orange-400/25 bg-orange-400/10 px-4 py-3 text-sm text-orange-100">
+                        Score: {lastPracticeAttempt.score}/100
+                      </div>
+                    ) : null}
                     {practiceHint ? (
                       <p className="mt-3 text-xs text-stone-500" role="status">
                         {practiceHint}
@@ -692,7 +648,10 @@ export default function Lessons() {
               <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-stone-700/60 pt-6">
                 <button
                   type="button"
-                  onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+                  onClick={() => {
+                    resetStepPractice();
+                    setStepIndex((i) => Math.max(0, i - 1));
+                  }}
                   disabled={stepIndex === 0}
                   className="inline-flex items-center gap-2 rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -705,6 +664,7 @@ export default function Lessons() {
                     if (isLastStep) {
                       void finishLesson();
                     } else {
+                      resetStepPractice();
                       setStepIndex((i) => Math.min(steps.length - 1, i + 1));
                     }
                   }}
@@ -738,45 +698,4 @@ export default function Lessons() {
       </div>
     </div>
   );
-}
-
-type SpeechRecognitionAlternative = {
-  transcript: string;
-};
-
-type SpeechRecognitionResult = ArrayLike<SpeechRecognitionAlternative> & {
-  length: number;
-  isFinal: boolean;
-};
-
-type SpeechRecognitionResultListEvent = {
-  results: ArrayLike<SpeechRecognitionResult> & {
-    length: number;
-    item?: (index: number) => SpeechRecognitionResult | null;
-    [index: number]: SpeechRecognitionResult;
-  };
-};
-
-type SpeechRecognitionErrorEvent = {
-  error?: string;
-};
-
-type SpeechRecognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onresult: ((event: SpeechRecognitionResultListEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognition;
-    webkitSpeechRecognition?: new () => SpeechRecognition;
-  }
 }

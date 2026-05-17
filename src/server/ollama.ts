@@ -1,6 +1,7 @@
 import { buildLessonStepsFromCore } from "@/lib/lessonSteps";
 
 import type {
+  AppSettings,
   Lesson,
   LessonGenerationInput,
   LessonLevel,
@@ -25,11 +26,18 @@ type OllamaErrorResponse = {
 const defaultBaseUrl = "http://127.0.0.1:11434";
 const defaultModel = "llama3.2";
 
-export function getOllamaConfig(options: OllamaOptions = {}) {
+export function getOllamaConfig(options: OllamaOptions | AppSettings = {}) {
+  const settings = "ollamaBaseUrl" in options ? options : null;
   return {
-    baseUrl: (options.baseUrl ?? process.env.OLLAMA_BASE_URL ?? defaultBaseUrl)
-      .replace(/\/+$/, ""),
-    model: options.model ?? process.env.OLLAMA_MODEL ?? defaultModel,
+    baseUrl: (
+      ("baseUrl" in options ? options.baseUrl : settings?.ollamaBaseUrl) ??
+      process.env.OLLAMA_BASE_URL ??
+      defaultBaseUrl
+    ).replace(/\/+$/, ""),
+    model:
+      ("model" in options ? options.model : settings?.ollamaModel) ??
+      process.env.OLLAMA_MODEL ??
+      defaultModel,
   };
 }
 

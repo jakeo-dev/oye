@@ -3,7 +3,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import {
   clearConversationMessages,
   getLesson,
+  getSettings,
   listConversationMessages,
+  recordActivity,
   saveConversationMessages,
 } from "@/server/database";
 import { generateConversationReply } from "@/server/ollama";
@@ -60,14 +62,16 @@ export default async function handler(
     const lesson = body.lessonId ? await getLesson(body.lessonId) : null;
 
     try {
+      const settings = await getSettings();
       const reply = await generateConversationReply(userText, lesson, {
-        baseUrl: body.ollamaBaseUrl,
-        model: body.ollamaModel,
+        baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
+        model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
       });
       const messages = await saveConversationMessages([
         newMessage("user", userText, body.lessonId ?? null),
         newMessage("assistant", reply, body.lessonId ?? null),
       ]);
+      await recordActivity({ minutes: 1, conversationMessages: 1 });
 
       res.status(201).json({ messages, reply });
     } catch (error) {

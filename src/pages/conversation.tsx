@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -11,6 +10,8 @@ import {
 
 import type { ConversationMessage, Lesson } from "@/server/types";
 
+import { useSoundEffect } from "@/hooks/useSoundEffect";
+import { useSpanishDictation } from "@/hooks/useSpanishDictation";
 import { useSpanishPromptSpeech } from "@/hooks/useSpanishPromptSpeech";
 
 import { Host_Grotesk } from "next/font/google";
@@ -52,14 +53,26 @@ export default function Conversation() {
   const [userText, setUserText] = useState("");
   const [status, setStatus] = useState("");
   const [isAwaitingReply, setIsAwaitingReply] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
-  /** Typed text before mic session; transcripts are appended to this string. */
-  const baseTextRef = useRef("");
+  const playSound = useSoundEffect();
 
   const { toggleSpeakPrompt, isSpeaking: isSpeakingPrompt } =
     useSpanishPromptSpeech(lesson, (message) => setStatus(message));
+  const { isListening, toggleListening, stopListening } = useSpanishDictation({
+    value: userText,
+    onChange: setUserText,
+    onStatus: setStatus,
+    messages: {
+      listening: "Listening...",
+      unsupported: "Speech recognition is not supported in this browser.",
+      denied:
+        "Microphone access denied. Allow the mic for this site and try again.",
+      startError:
+        "Could not start speech recognition. Try refreshing the page.",
+      genericError: (code) =>
+        `Speech error: ${code}. Try again or type your message.`,
+    },
+  });
 
   useEffect(() => {
     async function loadConversation() {
@@ -80,11 +93,6 @@ export default function Conversation() {
     }
 
     loadConversation().catch(() => setStatus("Could not load conversation."));
-
-    return () => {
-      recognitionRef.current?.abort();
-      recognitionRef.current = null;
-    };
   }, []);
 
   useEffect(() => {
@@ -96,6 +104,7 @@ export default function Conversation() {
     if (!trimmedText) {
       return;
     }
+    stopListening();
 
     const optimisticMessage: ConversationMessage = {
       id: `${OPTIMISTIC_USER_PREFIX}${Date.now()}`,
@@ -134,6 +143,8 @@ export default function Conversation() {
         ...current.filter((m) => !m.id.startsWith(OPTIMISTIC_USER_PREFIX)),
         ...newMessages,
       ]);
+      window.dispatchEvent(new Event("oye:progress-updated"));
+      playSound("success");
       setStatus("");
     } finally {
       setIsAwaitingReply(false);
@@ -159,107 +170,6 @@ export default function Conversation() {
 
     setMessages([]);
     setStatus("");
-  }
-
-  function startListening() {
-    const SpeechRecognitionCtor =
-      typeof window !== "undefined"
-        ? window.SpeechRecognition ?? window.webkitSpeechRecognition
-        : null;
-
-    if (!SpeechRecognitionCtor) {
-      setStatus("Speech recognition is not supported in this browser.");
-      return;
-    }
-
-    try {
-      recognitionRef.current?.abort();
-    } catch {
-      /* ignore */
-    }
-    recognitionRef.current = null;
-
-    baseTextRef.current = userText;
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = "es-ES";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (event: SpeechRecognitionResultListEvent) => {
-      let spoken = "";
-      for (let i = 0; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const first = result?.[0];
-        if (first?.transcript?.length) {
-          spoken += first.transcript;
-        }
-      }
-      const spokenTrimmed = spoken.trim();
-      const prefix = baseTextRef.current.trim();
-      const merged =
-        prefix && spokenTrimmed
-          ? `${prefix} ${spokenTrimmed}`
-          : spokenTrimmed || prefix;
-      setUserText(merged);
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      setIsListening(false);
-      recognitionRef.current = null;
-      const code = event.error ?? "unknown";
-      if (code === "aborted" || code === "no-speech") {
-        setStatus("");
-        return;
-      }
-      if (code === "not-allowed") {
-        setStatus(
-          "Microphone access denied. Allow the mic for this site and try again.",
-        );
-        return;
-      }
-      setStatus(`Speech error: ${code}. Try again or type your message.`);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      recognitionRef.current = null;
-      setStatus((current) => (current === "Listening..." ? "" : current));
-    };
-
-    recognitionRef.current = recognition;
-
-    try {
-      recognition.start();
-      setIsListening(true);
-      setStatus("Listening...");
-    } catch {
-      setIsListening(false);
-      recognitionRef.current = null;
-      setStatus("Could not start speech recognition. Try refreshing the page.");
-    }
-  }
-
-  function stopListening() {
-    if (!recognitionRef.current || !isListening) {
-      return;
-    }
-    try {
-      recognitionRef.current.stop();
-    } catch {
-      recognitionRef.current?.abort();
-      recognitionRef.current = null;
-      setIsListening(false);
-    }
-  }
-
-  function handleMicClick() {
-    if (isListening) {
-      stopListening();
-      return;
-    }
-    startListening();
   }
 
   return (
@@ -354,7 +264,7 @@ export default function Conversation() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
             <button
               type="button"
-              onClick={handleMicClick}
+              onClick={toggleListening}
               disabled={isAwaitingReply}
               className={`flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:self-auto ${
                 isListening
@@ -398,45 +308,4 @@ export default function Conversation() {
       </div>
     </div>
   );
-}
-
-type SpeechRecognitionAlternative = {
-  transcript: string;
-};
-
-type SpeechRecognitionResult = ArrayLike<SpeechRecognitionAlternative> & {
-  length: number;
-  isFinal: boolean;
-};
-
-type SpeechRecognitionResultListEvent = {
-  results: ArrayLike<SpeechRecognitionResult> & {
-    length: number;
-    item?: (index: number) => SpeechRecognitionResult | null;
-    [index: number]: SpeechRecognitionResult;
-  };
-};
-
-type SpeechRecognitionErrorEvent = {
-  error?: string;
-};
-
-type SpeechRecognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onresult: ((event: SpeechRecognitionResultListEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognition;
-    webkitSpeechRecognition?: new () => SpeechRecognition;
-  }
 }

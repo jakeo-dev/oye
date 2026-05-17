@@ -48,6 +48,17 @@ export type LessonProgress = {
   updatedAt: string;
 };
 
+export type PracticeAttempt = {
+  id: string;
+  lessonId: string;
+  stepIndex: number;
+  prompt: string;
+  transcript: string;
+  score: number;
+  feedback: string;
+  createdAt: string;
+};
+
 export type ConversationMessage = {
   id: string;
   lessonId: string | null;
@@ -56,10 +67,30 @@ export type ConversationMessage = {
   createdAt: string;
 };
 
+export type DailyProgress = {
+  date: string;
+  minutes: number;
+  lessonCompletions: number;
+  conversationMessages: number;
+  practiceAttempts: number;
+};
+
+export type AppSettings = {
+  soundEnabled: boolean;
+  remindersEnabled: boolean;
+  dailyGoalMinutes: number;
+  reminderTime: string;
+  ollamaBaseUrl: string | null;
+  ollamaModel: string | null;
+};
+
 export type AppDatabase = {
   lessons: Lesson[];
   progress: LessonProgress[];
   conversationMessages: ConversationMessage[];
+  practiceAttempts: PracticeAttempt[];
+  dailyProgress: DailyProgress[];
+  settings: AppSettings;
 };
 
 export type LessonGenerationInput = {
@@ -67,4 +98,3 @@ export type LessonGenerationInput = {
   scenario?: string;
   level?: LessonLevel;
 };
-

@@ -64,6 +64,7 @@ export default function Header({
 }: AppHeaderProps) {
   const router = useRouter();
   const [progressFraction, setProgressFraction] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("Daily progress");
 
   useEffect(() => {
     let cancelled = false;
@@ -71,13 +72,24 @@ export default function Header({
     async function loadProgress() {
       try {
         const response = await fetch("/api/progress");
-        const data = (await response.json()) as { fraction?: number };
-        if (
-          !cancelled &&
-          typeof data.fraction === "number" &&
-          !Number.isNaN(data.fraction)
-        ) {
-          setProgressFraction(Math.max(0, Math.min(1, data.fraction)));
+        const data = (await response.json()) as {
+          dailyFraction?: number;
+          today?: { minutes?: number };
+          dailyGoalMinutes?: number;
+          streakDays?: number;
+        };
+        if (!cancelled) {
+          const fraction =
+            typeof data.dailyFraction === "number" &&
+            !Number.isNaN(data.dailyFraction)
+              ? data.dailyFraction
+              : 0;
+          setProgressFraction(Math.max(0, Math.min(1, fraction)));
+          setProgressLabel(
+            `${data.today?.minutes ?? 0}/${data.dailyGoalMinutes ?? 10} min today${
+              data.streakDays ? ` · ${data.streakDays} day streak` : ""
+            }`,
+          );
         }
       } catch {
         /* ignore */
@@ -125,6 +137,8 @@ export default function Header({
               className="win-rate-bar-orange win-rate-bar-rounded mx-auto h-full w-full appearance-none overflow-hidden rounded-full bg-transparent"
               max={1}
               value={progressFraction}
+              title={progressLabel}
+              aria-label={progressLabel}
             />
           </div>
         )}

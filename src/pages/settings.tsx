@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDatabase,
+  faFloppyDisk,
   faTrashCan,
   faVolumeHigh,
   faBell,
@@ -10,21 +11,25 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Host_Grotesk } from "next/font/google";
 
+import { useSoundEffect } from "@/hooks/useSoundEffect";
+
 const hostGrotesk = Host_Grotesk({
   variable: "--font-host-grotesk",
   subsets: ["latin"],
 });
 
-const LS = {
-  sound: "oye:soundEnabled",
-  reminders: "oye:remindersEnabled",
-  dailyGoal: "oye:dailyGoalMinutes",
-} as const;
-
 type OllamaSettings = {
   ollama: {
     baseUrl: string;
     model: string;
+  };
+  settings: {
+    soundEnabled: boolean;
+    remindersEnabled: boolean;
+    dailyGoalMinutes: number;
+    reminderTime: string;
+    ollamaBaseUrl: string | null;
+    ollamaModel: string | null;
   };
   env: Record<string, string>;
 };
@@ -95,24 +100,101 @@ export default function Settings() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState("10");
+  const [reminderTime, setReminderTime] = useState("18:00");
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState("");
+  const [ollamaModel, setOllamaModel] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const playSound = useSoundEffect();
 
-  useEffect(() => {
-    fetch("/api/settings/ollama")
-      .then((response) => response.json())
-      .then((data: OllamaSettings) => setSettings(data))
-      .catch(() => setSettings(null));
+  const applySettings = useCallback((data: OllamaSettings) => {
+    setSettings(data);
+    setSoundEnabled(data.settings.soundEnabled);
+    setRemindersEnabled(data.settings.remindersEnabled);
+    setDailyGoalMinutes(String(data.settings.dailyGoalMinutes));
+    setReminderTime(data.settings.reminderTime);
+    setOllamaBaseUrl(data.settings.ollamaBaseUrl ?? data.ollama.baseUrl);
+    setOllamaModel(data.settings.ollamaModel ?? data.ollama.model);
   }, []);
 
-  useEffect(() => {
-    setMounted(true);
-    setSoundEnabled(localStorage.getItem(LS.sound) !== "0");
-    setRemindersEnabled(localStorage.getItem(LS.reminders) === "1");
-    const goal = localStorage.getItem(LS.dailyGoal);
-    if (goal === "5" || goal === "10" || goal === "15" || goal === "20") {
-      setDailyGoalMinutes(goal);
+  const loadSettings = useCallback(async () => {
+    try {
+      const response = await fetch("/api/settings/ollama");
+      const data = (await response.json()) as OllamaSettings;
+      applySettings(data);
+      setMounted(true);
+    } catch {
+      setSettings(null);
+      setMounted(true);
     }
-  }, []);
+  }, [applySettings]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadSettings();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [loadSettings]);
+
+  const patchSettings = useCallback(async (changes: Record<string, unknown>) => {
+    const response = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    });
+    const data = (await response.json()) as OllamaSettings;
+    if (!response.ok) {
+      throw new Error("Could not save settings.");
+    }
+    applySettings(data);
+    window.dispatchEvent(new Event("oye:settings-updated"));
+    window.dispatchEvent(new Event("oye:progress-updated"));
+    return data;
+  }, [applySettings]);
+
+  async function saveOllamaSettings() {
+    try {
+      const response = await fetch("/api/settings/ollama", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: ollamaBaseUrl,
+          model: ollamaModel,
+        }),
+      });
+      const data = (await response.json()) as OllamaSettings;
+      if (!response.ok) {
+        throw new Error("Could not save Ollama settings.");
+      }
+      applySettings(data);
+      window.dispatchEvent(new Event("oye:settings-updated"));
+      showToast("Ollama settings saved.");
+      playSound("success");
+    } catch {
+      showToast("Could not save Ollama settings.");
+    }
+  }
+
+  async function testOllamaSettings() {
+    try {
+      const response = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenario: "Testing the configured Ollama connection.",
+          level: "beginner",
+          ollamaBaseUrl,
+          ollamaModel,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Could not generate test lesson.");
+      }
+      showToast("Ollama generated a test lesson.");
+      playSound("success");
+    } catch {
+      showToast("Ollama test failed.");
+    }
+  }
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -120,48 +202,83 @@ export default function Settings() {
   }, []);
 
   const persistSound = useCallback(
-    (next: boolean) => {
+    async (next: boolean) => {
       setSoundEnabled(next);
-      localStorage.setItem(LS.sound, next ? "1" : "0");
-      showToast(next ? "Sound effects on." : "Sound effects off.");
+      try {
+        await patchSettings({ soundEnabled: next });
+        showToast(next ? "Sound effects on." : "Sound effects off.");
+        if (next) {
+          playSound("tap");
+        }
+      } catch {
+        setSoundEnabled(!next);
+        showToast("Could not save sound setting.");
+      }
     },
-    [showToast],
+    [patchSettings, playSound, showToast],
   );
 
   const persistReminders = useCallback(
-    (next: boolean) => {
+    async (next: boolean) => {
       setRemindersEnabled(next);
-      localStorage.setItem(LS.reminders, next ? "1" : "0");
-      showToast(
-        next ? "Reminder preference saved (browser only)." : "Reminders off.",
-      );
+      try {
+        await patchSettings({ remindersEnabled: next });
+        showToast(next ? "Practice reminders on." : "Reminders off.");
+        playSound("tap");
+      } catch {
+        setRemindersEnabled(!next);
+        showToast("Could not save reminder setting.");
+      }
     },
-    [showToast],
+    [patchSettings, playSound, showToast],
   );
 
   const persistDailyGoal = useCallback(
-    (value: string) => {
+    async (value: string) => {
       setDailyGoalMinutes(value);
-      localStorage.setItem(LS.dailyGoal, value);
-      showToast(`Daily goal set to ${value} minutes.`);
+      try {
+        await patchSettings({ dailyGoalMinutes: Number(value) });
+        showToast(`Daily goal set to ${value} minutes.`);
+        playSound("tap");
+      } catch {
+        showToast("Could not save daily goal.");
+      }
     },
-    [showToast],
+    [patchSettings, playSound, showToast],
   );
 
-  function clearSavedPreferences() {
+  async function persistReminderTime(value: string) {
+    setReminderTime(value);
+    try {
+      await patchSettings({ reminderTime: value });
+      showToast(`Reminder time set to ${value}.`);
+    } catch {
+      showToast("Could not save reminder time.");
+    }
+  }
+
+  async function clearSavedPreferences() {
     if (
       typeof window !== "undefined" &&
       !window.confirm(
-        "Clear saved preferences on this device? This resets toggles and your daily goal.",
+        "Clear saved preferences? This resets toggles, your daily goal, and Ollama overrides.",
       )
     ) {
       return;
     }
-    Object.values(LS).forEach((key) => localStorage.removeItem(key));
-    setSoundEnabled(true);
-    setRemindersEnabled(false);
-    setDailyGoalMinutes("10");
-    showToast("Preferences cleared.");
+    try {
+      await patchSettings({
+        soundEnabled: true,
+        remindersEnabled: false,
+        dailyGoalMinutes: 10,
+        reminderTime: "18:00",
+        ollamaBaseUrl: null,
+        ollamaModel: null,
+      });
+      showToast("Preferences cleared.");
+    } catch {
+      showToast("Could not clear preferences.");
+    }
   }
 
   return (
@@ -192,8 +309,8 @@ export default function Settings() {
                 Settings
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-pretty text-stone-400 sm:text-base">
-                Tune study habits and audio. These choices stay on this browser
-                unless you clear them.
+                Tune study habits, reminders, audio, and model settings. These
+                choices are saved by the app backend.
               </p>
             </div>
           </div>
@@ -214,14 +331,14 @@ export default function Settings() {
                 checked={soundEnabled}
                 onChange={persistSound}
                 label="Sound effects"
-                description="Reserved for future playback cues and success sounds in the app."
+                description="Play short cues when practice, messages, and settings save successfully."
                 icon={faVolumeHigh}
               />
               <SettingSwitch
                 checked={remindersEnabled}
                 onChange={persistReminders}
                 label="Practice reminders"
-                description="Remember to study (stored locally; connect a calendar later for real alerts)."
+                description="Show a browser notification at your saved reminder time while the app is open."
                 icon={faBell}
               />
             </div>
@@ -256,6 +373,22 @@ export default function Settings() {
                 <option value="20">20 minutes</option>
               </select>
             </div>
+            <div className="mt-4 flex flex-col gap-2 border-t border-stone-700/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-left">
+                <p className="font-semibold text-stone-100">Reminder time</p>
+                <p className="mt-0.5 text-sm text-stone-400">
+                  Browser notification time for daily practice.
+                </p>
+              </div>
+              <input
+                type="time"
+                value={reminderTime}
+                onChange={(e) => void persistReminderTime(e.target.value)}
+                disabled={!mounted || !remindersEnabled}
+                className="mt-3 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50 sm:mt-0 sm:w-44"
+                aria-label="Practice reminder time"
+              />
+            </div>
           </section>
 
           <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
@@ -263,8 +396,8 @@ export default function Settings() {
               Data on this device
             </h2>
             <p className="mt-1 text-sm text-stone-400">
-              Remove locally stored preference keys. Your lessons on the server
-              are not deleted.
+              Reset saved preferences. Your lessons and conversation history are
+              not deleted.
             </p>
             <button
               type="button"
@@ -289,34 +422,58 @@ export default function Settings() {
               </h2>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-stone-400">
-              Read-only view of how this dev server is configured. Set{" "}
-              <code className="rounded bg-stone-800 px-1.5 py-0.5 text-xs text-orange-200/90">
-                OLLAMA_BASE_URL
-              </code>
-              ,{" "}
-              <code className="rounded bg-stone-800 px-1.5 py-0.5 text-xs text-orange-200/90">
-                OLLAMA_MODEL
-              </code>
-              , or{" "}
-              <code className="rounded bg-stone-800 px-1.5 py-0.5 text-xs text-orange-200/90">
-                APP_DATABASE_PATH
-              </code>{" "}
-              before starting Next.js to change targets.
+              Save model settings without restarting Next.js. Environment
+              variables remain the fallback when these fields are blank.
             </p>
-            <dl className="mt-4 space-y-3 rounded-xl border border-stone-700/60 bg-stone-950/50 p-4 text-sm">
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between">
-                <dt className="font-semibold text-stone-300">Base URL</dt>
-                <dd className="font-mono text-xs break-all text-stone-400 sm:text-right sm:text-sm">
-                  {settings?.ollama.baseUrl ?? "Loading…"}
-                </dd>
+            <div className="mt-4 space-y-4 rounded-xl border border-stone-700/60 bg-stone-950/50 p-4 text-sm">
+              <div>
+                <label
+                  className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
+                  htmlFor="ollama-base-url"
+                >
+                  Base URL
+                </label>
+                <input
+                  id="ollama-base-url"
+                  value={ollamaBaseUrl}
+                  onChange={(e) => setOllamaBaseUrl(e.target.value)}
+                  className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                  placeholder={settings?.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434"}
+                />
               </div>
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between">
-                <dt className="font-semibold text-stone-300">Model</dt>
-                <dd className="font-mono text-xs break-all text-stone-400 sm:text-right sm:text-sm">
-                  {settings?.ollama.model ?? "Loading…"}
-                </dd>
+              <div>
+                <label
+                  className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
+                  htmlFor="ollama-model"
+                >
+                  Model
+                </label>
+                <input
+                  id="ollama-model"
+                  value={ollamaModel}
+                  onChange={(e) => setOllamaModel(e.target.value)}
+                  className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                  placeholder={settings?.env.OLLAMA_MODEL ?? "llama3.2"}
+                />
               </div>
-            </dl>
+              <div className="flex flex-wrap gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => void saveOllamaSettings()}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300"
+                >
+                  <FontAwesomeIcon icon={faFloppyDisk} className="text-sm" />
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void testOllamaSettings()}
+                  className="inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
+                >
+                  Test
+                </button>
+              </div>
+            </div>
           </section>
         </div>
 
