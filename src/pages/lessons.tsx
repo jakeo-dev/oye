@@ -20,6 +20,7 @@ import type {
   LessonStep,
   PracticeAttempt,
 } from "@/server/types";
+import type { CurriculumSection } from "@/lib/curriculum";
 
 import { resolveLessonSteps } from "@/lib/lessonSteps";
 import { useSoundEffect } from "@/hooks/useSoundEffect";
@@ -112,6 +113,10 @@ export default function Lessons() {
   const [lastPracticeAttempt, setLastPracticeAttempt] =
     useState<PracticeAttempt | null>(null);
   const [isSavingPractice, setIsSavingPractice] = useState(false);
+  const [currentCurriculumSection, setCurrentCurriculumSection] =
+    useState<CurriculumSection | null>(null);
+  const [curriculumCompletedCount, setCurriculumCompletedCount] = useState(0);
+  const [curriculumTotal, setCurriculumTotal] = useState(0);
   const playSound = useSoundEffect();
 
   const steps = useMemo(
@@ -149,10 +154,23 @@ export default function Lessons() {
   useEffect(() => {
     async function peekLatestLesson() {
       try {
-        const response = await fetch("/api/lessons");
-        const data = (await response.json()) as { lessons: Lesson[] };
-        const latest = data.lessons[0];
+        const [lessonResponse, curriculumResponse] = await Promise.all([
+          fetch("/api/lessons"),
+          fetch("/api/curriculum"),
+        ]);
+        const lessonData = (await lessonResponse.json()) as {
+          lessons: Lesson[];
+        };
+        const curriculumData = (await curriculumResponse.json()) as {
+          currentSection?: CurriculumSection;
+          completedCount?: number;
+          total?: number;
+        };
+        const latest = lessonData.lessons[0];
         setLastLessonId(latest?.id ?? null);
+        setCurrentCurriculumSection(curriculumData.currentSection ?? null);
+        setCurriculumCompletedCount(curriculumData.completedCount ?? 0);
+        setCurriculumTotal(curriculumData.total ?? 0);
       } catch {
         /* ignore */
       }
@@ -240,6 +258,7 @@ export default function Lessons() {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("oye:progress-updated"));
       }
+      await refreshCurriculum();
       playSound("success");
       newLessonFlow();
     } catch {
@@ -296,6 +315,22 @@ export default function Lessons() {
     stopListening();
   }
 
+  async function refreshCurriculum() {
+    try {
+      const response = await fetch("/api/curriculum");
+      const data = (await response.json()) as {
+        currentSection?: CurriculumSection;
+        completedCount?: number;
+        total?: number;
+      };
+      setCurrentCurriculumSection(data.currentSection ?? null);
+      setCurriculumCompletedCount(data.completedCount ?? 0);
+      setCurriculumTotal(data.total ?? 0);
+    } catch {
+      /* keep current */
+    }
+  }
+
   return (
     <div
       className={`${hostGrotesk.className} relative isolate min-h-[calc(100dvh-5.5rem)] overflow-hidden bg-stone-950 text-stone-100`}
@@ -326,6 +361,25 @@ export default function Lessons() {
               <p className="mt-3 max-w-2xl text-pretty text-stone-400">
                 Choose where you’ll use Spanish. The app builds a short lesson—overview, vocabulary, grammar, a key phrase, and practice—using the same AI as the generate button.
               </p>
+              {currentCurriculumSection ? (
+                <div className="mt-5 rounded-xl border border-orange-400/25 bg-orange-400/10 p-4 text-left">
+                  <p className="text-xs font-semibold tracking-[0.16em] text-orange-300 uppercase">
+                    Current grammar path
+                  </p>
+                  <h2 className="mt-1 text-lg font-black text-orange-50">
+                    {currentCurriculumSection.title}
+                  </h2>
+                  <p className="mt-1 text-sm text-orange-100/80">
+                    {currentCurriculumSection.partTitle}
+                    {curriculumTotal > 0
+                      ? ` · ${curriculumCompletedCount}/${curriculumTotal} complete`
+                      : ""}
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-stone-300">
+                    {currentCurriculumSection.focus}
+                  </p>
+                </div>
+              ) : null}
 
               <fieldset className="mt-6">
                 <legend className="text-xs font-semibold tracking-wide text-stone-500">
@@ -473,6 +527,12 @@ export default function Lessons() {
                   <p className="text-xs font-semibold tracking-[0.2em] text-orange-400/90 uppercase">
                     {lesson.title}
                   </p>
+                  {lesson.curriculumSectionTitle ? (
+                    <p className="mt-1 text-xs font-semibold text-orange-200/90">
+                      {lesson.curriculumPartTitle}:{" "}
+                      {lesson.curriculumSectionTitle}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-stone-500">
                     Context: {lesson.scenario}
                   </p>

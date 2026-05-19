@@ -1,6 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import { getSettings, listLessons, saveLesson } from "@/server/database";
+import {
+  getCurrentCurriculumSection,
+  getSettings,
+  listLessons,
+  saveLesson,
+} from "@/server/database";
 import {
   generateFallbackLesson,
   generateLessonWithOllama,
@@ -30,9 +35,15 @@ export default async function handler(
 
     try {
       const settings = await getSettings();
+      const currentCurriculumSection = await getCurrentCurriculumSection();
+      const generationInput: LessonGenerationInput = {
+        ...body,
+        curriculumSectionId:
+          body.curriculumSectionId ?? currentCurriculumSection.id,
+      };
       const lesson = body.useFallback
-        ? generateFallbackLesson(body)
-        : await generateLessonWithOllama(body, {
+        ? generateFallbackLesson(generationInput)
+        : await generateLessonWithOllama(generationInput, {
             baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
             model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
           });

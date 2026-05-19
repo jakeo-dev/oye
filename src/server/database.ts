@@ -5,11 +5,20 @@ import type {
   AppDatabase,
   AppSettings,
   ConversationMessage,
+  CurriculumProgress,
   DailyProgress,
   Lesson,
   LessonProgress,
   PracticeAttempt,
 } from "./types";
+
+import {
+  CURRICULUM_SECTIONS,
+  getCurriculumIndex,
+  getFirstCurriculumSection,
+  getNextCurriculumSection,
+} from "@/lib/curriculum";
+import type { CurriculumSection } from "@/lib/curriculum";
 
 const databasePath =
   process.env.APP_DATABASE_PATH ?? path.join("data", "app-db.json");
@@ -20,6 +29,7 @@ const emptyDatabase = (): AppDatabase => ({
   conversationMessages: [],
   practiceAttempts: [],
   dailyProgress: [],
+  curriculumProgress: [],
   settings: defaultSettings(),
 });
 
@@ -77,12 +87,23 @@ export async function saveLesson(lesson: Lesson): Promise<Lesson> {
   return lesson;
 }
 
+export async function getCurrentCurriculumSection(): Promise<CurriculumSection> {
+  const database = await readDatabase();
+  const completedIds = new Set(
+    database.curriculumProgress
+      .filter((item) => item.completed)
+      .map((item) => item.sectionId),
+  );
+  return getNextCurriculumSection(completedIds) ?? getFirstCurriculumSection();
+}
+
 export async function upsertProgress(
   lessonId: string,
   changes: Partial<Pick<LessonProgress, "completed" | "lastScore">>,
 ): Promise<LessonProgress> {
   const database = await readDatabase();
   const existing = database.progress.find((item) => item.lessonId === lessonId);
+  const lesson = database.lessons.find((item) => item.id === lessonId) ?? null;
   const completedNow = changes.completed === true && existing?.completed !== true;
   const progress: LessonProgress = {
     lessonId,
@@ -97,6 +118,12 @@ export async function upsertProgress(
     ...database.progress.filter((item) => item.lessonId !== lessonId),
   ];
   if (completedNow) {
+    if (lesson?.curriculumSectionId) {
+      upsertCurriculumProgressInDatabase(database, lesson.curriculumSectionId, {
+        completed: true,
+        lastLessonId: lesson.id,
+      });
+    }
     incrementDailyProgress(database, {
       minutes: 3,
       lessonCompletions: 1,
@@ -117,6 +144,9 @@ export async function getProgressSummary(): Promise<{
   completedLessonCount: number;
   lessonTotal: number;
   fraction: number;
+  curriculumCompletedCount: number;
+  curriculumTotal: number;
+  currentCurriculumSection: CurriculumSection;
   today: DailyProgress;
   dailyGoalMinutes: number;
   dailyFraction: number;
@@ -132,6 +162,13 @@ export async function getProgressSummary(): Promise<{
       ? 0
       : Math.min(1, completedLessonCount / lessonTotal);
   const today = getDailyProgressForDate(database, todayKey());
+  const completedCurriculumIds = new Set(
+    database.curriculumProgress
+      .filter((item) => item.completed)
+      .map((item) => item.sectionId),
+  );
+  const currentCurriculumSection =
+    getNextCurriculumSection(completedCurriculumIds) ?? getFirstCurriculumSection();
   const dailyGoalMinutes = database.settings.dailyGoalMinutes;
   const dailyFraction =
     dailyGoalMinutes <= 0 ? 0 : Math.min(1, today.minutes / dailyGoalMinutes);
@@ -139,10 +176,43 @@ export async function getProgressSummary(): Promise<{
     completedLessonCount,
     lessonTotal,
     fraction,
+    curriculumCompletedCount: Math.min(
+      completedCurriculumIds.size,
+      CURRICULUM_SECTIONS.length,
+    ),
+    curriculumTotal: CURRICULUM_SECTIONS.length,
+    currentCurriculumSection,
     today,
     dailyGoalMinutes,
     dailyFraction,
     streakDays: getStreakDays(database.dailyProgress),
+  };
+}
+
+export async function getCurriculumProgressSummary(): Promise<{
+  sections: Array<CurriculumSection & { completed: boolean; active: boolean }>;
+  currentSection: CurriculumSection;
+  completedCount: number;
+  total: number;
+}> {
+  const database = await readDatabase();
+  const completedIds = new Set(
+    database.curriculumProgress
+      .filter((item) => item.completed)
+      .map((item) => item.sectionId),
+  );
+  const currentSection =
+    getNextCurriculumSection(completedIds) ?? getFirstCurriculumSection();
+
+  return {
+    sections: CURRICULUM_SECTIONS.map((sectionItem) => ({
+      ...sectionItem,
+      completed: completedIds.has(sectionItem.id),
+      active: sectionItem.id === currentSection.id,
+    })),
+    currentSection,
+    completedCount: Math.min(completedIds.size, CURRICULUM_SECTIONS.length),
+    total: CURRICULUM_SECTIONS.length,
   };
 }
 
@@ -264,6 +334,35 @@ function normalizeSettings(changes: Partial<AppSettings>): Partial<AppSettings> 
     next.ollamaModel = changes.ollamaModel?.trim() || null;
   }
   return next;
+}
+
+function upsertCurriculumProgressInDatabase(
+  database: AppDatabase,
+  sectionId: string,
+  changes: Partial<Pick<CurriculumProgress, "completed" | "lastLessonId">>,
+): CurriculumProgress {
+  const existing = database.curriculumProgress.find(
+    (item) => item.sectionId === sectionId,
+  );
+  const completed = changes.completed ?? existing?.completed ?? false;
+  const progress: CurriculumProgress = {
+    sectionId,
+    completed,
+    completedAt:
+      completed && !existing?.completed
+        ? new Date().toISOString()
+        : existing?.completedAt ?? null,
+    attempts: (existing?.attempts ?? 0) + 1,
+    lastLessonId: changes.lastLessonId ?? existing?.lastLessonId ?? null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  database.curriculumProgress = [
+    progress,
+    ...database.curriculumProgress.filter((item) => item.sectionId !== sectionId),
+  ].sort((a, b) => getCurriculumIndex(a.sectionId) - getCurriculumIndex(b.sectionId));
+
+  return progress;
 }
 
 function todayKey(): string {

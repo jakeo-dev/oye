@@ -26,6 +26,9 @@ export type LessonStep = {
 
 export type Lesson = {
   id: string;
+  curriculumSectionId?: string;
+  curriculumSectionTitle?: string;
+  curriculumPartTitle?: string;
   title: string;
   level: LessonLevel;
   scenario: string;
@@ -75,6 +78,15 @@ export type DailyProgress = {
   practiceAttempts: number;
 };
 
+export type CurriculumProgress = {
+  sectionId: string;
+  completed: boolean;
+  completedAt: string | null;
+  attempts: number;
+  lastLessonId: string | null;
+  updatedAt: string;
+};
+
 export type AppSettings = {
   soundEnabled: boolean;
   remindersEnabled: boolean;
@@ -90,6 +102,7 @@ export type AppDatabase = {
   conversationMessages: ConversationMessage[];
   practiceAttempts: PracticeAttempt[];
   dailyProgress: DailyProgress[];
+  curriculumProgress: CurriculumProgress[];
   settings: AppSettings;
 };
 
@@ -97,4 +110,5 @@ export type LessonGenerationInput = {
   topic?: string;
   scenario?: string;
   level?: LessonLevel;
+  curriculumSectionId?: string;
 };

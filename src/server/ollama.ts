@@ -1,4 +1,6 @@
 import { buildLessonStepsFromCore } from "@/lib/lessonSteps";
+import { getCurriculumSection } from "@/lib/curriculum";
+import type { CurriculumSection } from "@/lib/curriculum";
 
 import type {
   AppSettings,
@@ -155,11 +157,20 @@ async function createOllamaError(response: Response): Promise<Error> {
 
 function createFallbackLesson(input: LessonGenerationInput): Lesson {
   const scenario = input.scenario ?? input.topic ?? "ordering coffee in Alicante";
+  const curriculumSection = getCurriculumSection(input.curriculumSectionId);
   const core = {
-    title: "Cafe Basics",
-    touristFocus: "Polite cafe ordering and simple follow-up questions.",
-    spanishPrompt: "Hola, quiero un cafe con leche, por favor.",
-    englishTranslation: "Hello, I want a coffee with milk, please.",
+    title: curriculumSection
+      ? `${curriculumSection.title} in Context`
+      : "Cafe Basics",
+    touristFocus: curriculumSection
+      ? `${curriculumSection.focus} Practice this through the selected scenario.`
+      : "Polite cafe ordering and simple follow-up questions.",
+    spanishPrompt: curriculumSection
+      ? "El cafe es pequeno, pero la mesa es grande."
+      : "Hola, quiero un cafe con leche, por favor.",
+    englishTranslation: curriculumSection
+      ? "The coffee is small, but the table is big."
+      : "Hello, I want a coffee with milk, please.",
     vocabulary: [
       { spanish: "quiero", english: "I want" },
       { spanish: "por favor", english: "please" },
@@ -173,6 +184,9 @@ function createFallbackLesson(input: LessonGenerationInput): Lesson {
 
   return {
     id: idFromDate("lesson"),
+    curriculumSectionId: curriculumSection?.id,
+    curriculumSectionTitle: curriculumSection?.title,
+    curriculumPartTitle: curriculumSection?.partTitle,
     title: core.title,
     level: normalizeLevel(input.level),
     scenario,
@@ -187,6 +201,44 @@ function createFallbackLesson(input: LessonGenerationInput): Lesson {
   };
 }
 
+function buildLessonPrompt({
+  curriculumSection,
+  level,
+  scenario,
+}: {
+  curriculumSection: CurriculumSection | null;
+  level: LessonLevel;
+  scenario: string;
+}): string {
+  const curriculumLines = curriculumSection
+    ? [
+        `Curriculum part: ${curriculumSection.partTitle}`,
+        `Curriculum section: ${curriculumSection.title}`,
+        `Grammar focus: ${curriculumSection.focus}`,
+        "Required concepts:",
+        ...curriculumSection.concepts.map((concept) => `- ${concept}`),
+        "Teaching guidance:",
+        ...curriculumSection.promptGuidance.map((item) => `- ${item}`),
+        "Make this lesson primarily teach the curriculum section above while using the scenario for examples, vocabulary, and practice.",
+      ]
+    : [
+        "Curriculum section: general tourist Spanish review.",
+        "Use the scenario for examples, vocabulary, and practice.",
+      ];
+
+  return [
+    "Create a short multi-step Spanish lesson for an English-speaking tourist beginner in Alicante.",
+    ...curriculumLines,
+    "Return only JSON with this exact shape (steps must be 4 to 6 items, in teaching order):",
+    '{"title":"string","scenario":"string","touristFocus":"string","spanishPrompt":"string","englishTranslation":"string","vocabulary":[{"spanish":"string","english":"string"}],"practiceQuestions":["string"],"steps":[{"kind":"overview|vocabulary|grammar|phrase|practice","title":"string","body":"string","words":[{"spanish":"string","english":"string"}],"spanish":"string","english":"string"}]}',
+    "Rules for steps: use kind overview first (set expectations), then vocabulary (include words array), grammar (explain the curriculum section clearly; spanish/english optional), phrase (key line in spanish + english), practice last (body with 2-4 prompts, no need for spanish field).",
+    "Omit optional fields when empty.",
+    `Level: ${level}`,
+    `Scenario: ${scenario}`,
+    "Keep Spanish natural, practical, and beginner friendly.",
+  ].join("\n");
+}
+
 export async function generateLessonWithOllama(
   input: LessonGenerationInput,
   options: OllamaOptions = {},
@@ -194,16 +246,8 @@ export async function generateLessonWithOllama(
   const { baseUrl, model } = getOllamaConfig(options);
   const level = normalizeLevel(input.level);
   const scenario = input.scenario ?? input.topic ?? "tourist basics in Alicante";
-  const prompt = [
-    "Create a short multi-step Spanish lesson for an English-speaking tourist beginner in Alicante.",
-    "Return only JSON with this exact shape (steps must be 4 to 6 items, in teaching order):",
-    '{"title":"string","scenario":"string","touristFocus":"string","spanishPrompt":"string","englishTranslation":"string","vocabulary":[{"spanish":"string","english":"string"}],"practiceQuestions":["string"],"steps":[{"kind":"overview|vocabulary|grammar|phrase|practice","title":"string","body":"string","words":[{"spanish":"string","english":"string"}],"spanish":"string","english":"string"}]}',
-    "Rules for steps: use kind overview first (set expectations), then vocabulary (include words array), grammar (explain one pattern; spanish/english optional), phrase (key line in spanish + english), practice last (body with 2-4 prompts, no need for spanish field).",
-    "Omit optional fields when empty.",
-    `Level: ${level}`,
-    `Scenario: ${scenario}`,
-    "Keep Spanish natural, practical, and beginner friendly.",
-  ].join("\n");
+  const curriculumSection = getCurriculumSection(input.curriculumSectionId);
+  const prompt = buildLessonPrompt({ curriculumSection, level, scenario });
 
   const response = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
@@ -253,6 +297,9 @@ export async function generateLessonWithOllama(
 
   return {
     ...createFallbackLesson(input),
+    curriculumSectionId: curriculumSection?.id,
+    curriculumSectionTitle: curriculumSection?.title,
+    curriculumPartTitle: curriculumSection?.partTitle,
     title,
     level,
     scenario: String(generated.scenario ?? scenario),
@@ -268,13 +315,30 @@ export async function generateLessonWithOllama(
 
 export async function generateConversationReply(
   userText: string,
-  lesson: Pick<Lesson, "scenario" | "spanishPrompt"> | null,
+  lesson: Pick<
+    Lesson,
+    | "scenario"
+    | "spanishPrompt"
+    | "curriculumSectionId"
+    | "curriculumSectionTitle"
+    | "curriculumPartTitle"
+  > | null,
   options: OllamaOptions = {},
 ): Promise<string> {
   const { baseUrl, model } = getOllamaConfig(options);
+  const curriculumSection = getCurriculumSection(lesson?.curriculumSectionId);
   const prompt = [
     "You are a patient Spanish tutor for an English-speaking tourist beginner.",
     "Reply in simple Spanish first, then one concise English hint.",
+    lesson?.curriculumPartTitle
+      ? `Curriculum part: ${lesson.curriculumPartTitle}`
+      : "",
+    lesson?.curriculumSectionTitle
+      ? `Current curriculum section: ${lesson.curriculumSectionTitle}`
+      : "",
+    curriculumSection
+      ? `Keep your correction aligned with this grammar focus: ${curriculumSection.focus}`
+      : "",
     lesson ? `Lesson scenario: ${lesson.scenario}` : "Scenario: tourist Spanish practice.",
     lesson ? `Current lesson phrase: ${lesson.spanishPrompt}` : "",
     `Student said: ${userText}`,
