@@ -120,7 +120,7 @@ export default function Home() {
               height={500}
               alt="Spanish learning app mascot"
               priority
-              className="mx-auto h-auto w-full max-w-[280px] object-contain drop-shadow-2xl sm:max-w-[320px]"
+              className="mx-auto h-auto w-full max-w-70 object-contain drop-shadow-2xl sm:max-w-[320px]"
             />
           </div>
         </div>
