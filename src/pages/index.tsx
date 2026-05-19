@@ -15,6 +15,8 @@ const hostGrotesk = Host_Grotesk({
   subsets: ["latin"],
 });
 
+const isLocal = process.env.NODE_ENV === "development";
+
 function FeatureCard({
   title,
   description,
@@ -27,7 +29,7 @@ function FeatureCard({
   return (
     <article className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-6 shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/25 hover:bg-stone-900/60">
       <div
-        className="flex h-12 w-12 mx-auto items-center justify-center rounded-xl bg-orange-400/15 text-orange-400"
+        className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400"
         aria-hidden
       >
         <FontAwesomeIcon icon={icon} className="text-xl" />
@@ -43,8 +45,6 @@ function FeatureCard({
 }
 
 export default function Home() {
-  const isLocal = process.env.NODE_ENV !== "development";
-
   return (
     <div
       className={`${hostGrotesk.className} relative isolate min-h-screen overflow-hidden bg-stone-950 text-stone-100`}
@@ -88,6 +88,11 @@ export default function Home() {
       <main className="relative z-10 mx-auto flex w-full max-w-220 flex-col gap-16 px-8 py-12 md:gap-20 md:py-16">
         <section className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
           <div className="flex flex-col items-center space-y-6 lg:block lg:text-right">
+            {isLocal && (
+              <p className="text-sm font-semibold tracking-wide text-orange-400/90 uppercase">
+                Running locally
+              </p>
+            )}
             <h2 className="text-4xl leading-[1.1] font-black tracking-tight text-pretty text-white md:text-5xl lg:text-6xl">
               Learn what you need to know.
             </h2>
