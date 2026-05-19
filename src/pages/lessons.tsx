@@ -5,6 +5,8 @@ import {
   faChevronLeft,
   faChevronRight,
   faCheck,
+  faBackward,
+  faForward,
   faMicrophone,
   faPenToSquare,
   faPills,
@@ -32,6 +34,8 @@ const hostGrotesk = Host_Grotesk({
   variable: "--font-host-grotesk",
   subsets: ["latin"],
 });
+
+const IS_DEV = process.env.NODE_ENV !== "production";
 
 type FlowPhase = "pick-context" | "custom-details" | "lesson";
 
@@ -365,6 +369,50 @@ export default function Lessons() {
     }
   }
 
+  async function runDevCurriculumAction(
+    action: "dev-complete-current-section" | "dev-reopen-previous-section",
+  ) {
+    setStatus(
+      action === "dev-complete-current-section"
+        ? "Skipping current grammar section..."
+        : "Going back one grammar section...",
+    );
+    try {
+      const response = await fetch("/api/curriculum", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = (await response.json()) as {
+        currentSection?: CurriculumSection;
+        completedCount?: number;
+        total?: number;
+        error?: string;
+      };
+
+      if (!response.ok || !data.currentSection) {
+        setStatus(data.error ?? "Could not skip section.");
+        return;
+      }
+
+      setLesson(null);
+      setPhase("pick-context");
+      setCurrentCurriculumSection(data.currentSection);
+      setCurriculumCompletedCount(data.completedCount ?? 0);
+      setCurriculumTotal(data.total ?? 0);
+      resetStepPractice();
+      window.dispatchEvent(new Event("oye:progress-updated"));
+      setStatus(
+        action === "dev-complete-current-section"
+          ? "Skipped to the next grammar section."
+          : "Moved back one grammar section.",
+      );
+      playSound("tap");
+    } catch {
+      setStatus("Could not change section.");
+    }
+  }
+
   return (
     <div
       className={`${hostGrotesk.className} relative isolate min-h-[calc(100dvh-5.5rem)] overflow-hidden bg-stone-950 text-stone-100`}
@@ -412,6 +460,37 @@ export default function Lessons() {
                   <p className="mt-2 text-sm leading-relaxed text-stone-300">
                     {currentCurriculumSection.focus}
                   </p>
+                  {IS_DEV ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runDevCurriculumAction(
+                            "dev-reopen-previous-section",
+                          )
+                        }
+                        className="inline-flex items-center gap-2 rounded-full border border-orange-300/40 px-3 py-1.5 text-xs font-bold text-orange-100 transition hover:bg-orange-300/10"
+                      >
+                        <FontAwesomeIcon
+                          icon={faBackward}
+                          className="text-xs"
+                        />
+                        Dev previous section
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runDevCurriculumAction(
+                            "dev-complete-current-section",
+                          )
+                        }
+                        className="inline-flex items-center gap-2 rounded-full border border-orange-300/40 px-3 py-1.5 text-xs font-bold text-orange-100 transition hover:bg-orange-300/10"
+                      >
+                        <FontAwesomeIcon icon={faForward} className="text-xs" />
+                        Dev skip section
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

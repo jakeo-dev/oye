@@ -284,6 +284,89 @@ export async function getCurriculumProgressSummary(): Promise<{
   };
 }
 
+export async function devCompleteCurrentCurriculumSection(): Promise<{
+  completedSection: CurriculumSection;
+  currentSection: CurriculumSection;
+  completedCount: number;
+  total: number;
+}> {
+  const database = await readDatabase();
+  const completedIds = new Set(
+    database.curriculumProgress
+      .filter((item) => item.completed)
+      .map((item) => item.sectionId),
+  );
+  const completedSection =
+    getNextCurriculumSection(completedIds) ?? getFirstCurriculumSection();
+
+  upsertCurriculumProgressInDatabase(database, completedSection.id, {
+    completed: true,
+    lastLessonId: null,
+  });
+  await writeDatabase(database);
+
+  const refreshedCompletedIds = new Set(
+    database.curriculumProgress
+      .filter((item) => item.completed)
+      .map((item) => item.sectionId),
+  );
+  const currentSection =
+    getNextCurriculumSection(refreshedCompletedIds) ?? completedSection;
+
+  return {
+    completedSection,
+    currentSection,
+    completedCount: Math.min(refreshedCompletedIds.size, CURRICULUM_SECTIONS.length),
+    total: CURRICULUM_SECTIONS.length,
+  };
+}
+
+export async function devReopenPreviousCurriculumSection(): Promise<{
+  reopenedSection: CurriculumSection;
+  currentSection: CurriculumSection;
+  completedCount: number;
+  total: number;
+}> {
+  const database = await readDatabase();
+  const completedIds = new Set(
+    database.curriculumProgress
+      .filter((item) => item.completed)
+      .map((item) => item.sectionId),
+  );
+  const lastCompletedSection = [...CURRICULUM_SECTIONS]
+    .reverse()
+    .find((sectionItem) => completedIds.has(sectionItem.id));
+
+  if (!lastCompletedSection) {
+    return {
+      reopenedSection: getFirstCurriculumSection(),
+      currentSection: getFirstCurriculumSection(),
+      completedCount: 0,
+      total: CURRICULUM_SECTIONS.length,
+    };
+  }
+
+  database.curriculumProgress = database.curriculumProgress.filter(
+    (item) => item.sectionId !== lastCompletedSection.id,
+  );
+  await writeDatabase(database);
+
+  const refreshedCompletedIds = new Set(
+    database.curriculumProgress
+      .filter((item) => item.completed)
+      .map((item) => item.sectionId),
+  );
+  const currentSection =
+    getNextCurriculumSection(refreshedCompletedIds) ?? getFirstCurriculumSection();
+
+  return {
+    reopenedSection: lastCompletedSection,
+    currentSection,
+    completedCount: Math.min(refreshedCompletedIds.size, CURRICULUM_SECTIONS.length),
+    total: CURRICULUM_SECTIONS.length,
+  };
+}
+
 export async function saveConversationMessages(
   messages: ConversationMessage[],
 ): Promise<ConversationMessage[]> {
