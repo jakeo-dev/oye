@@ -122,9 +122,6 @@ export default function Home() {
               priority
               className="mx-auto h-auto w-full max-w-[280px] object-contain drop-shadow-2xl sm:max-w-[320px]"
             />
-            <p className="mt-4 text-center text-sm text-stone-500">
-              Your Spanish practice companion
-            </p>
           </div>
         </div>
       </div>
