@@ -18,9 +18,20 @@ ensure_homebrew() {
     return
   fi
 
-  echo "Homebrew is not installed."
-  echo "Install it from https://brew.sh, then rerun this script."
-  exit 1
+  echo "Homebrew is not installed. Installing Homebrew..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+  if [ -x "/opt/homebrew/bin/brew" ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [ -x "/usr/local/bin/brew" ]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+  fi
+
+  if ! command_exists brew; then
+    echo "Homebrew installed, but brew is not on PATH yet."
+    echo "Open a new terminal, then rerun this script."
+    exit 1
+  fi
 }
 
 ensure_command_with_brew() {
