@@ -47,18 +47,6 @@ Manual prerequisites:
 - npm
 - Ollama for macOS
 
-## Getting Started
+## Start Learning
 
-After setup, run the development server:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-## Running the AI Locally
-
-Install Ollama: [https://ollama.com/download](https://ollama.com/download).
-
-After installing, run `ollama pull llama3.2` in the terminal. 
+Open [http://localhost:3000](http://localhost:3000) with your browser to start using ¡Oye!
