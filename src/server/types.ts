@@ -26,6 +26,7 @@ export type LessonStep = {
 
 export type Lesson = {
   id: string;
+  scenarioPresetId?: string;
   curriculumSectionId?: string;
   curriculumSectionTitle?: string;
   curriculumPartTitle?: string;
@@ -41,6 +42,16 @@ export type Lesson = {
   steps?: LessonStep[];
   createdAt: string;
   source: "ollama" | "fallback";
+};
+
+export type CachedLesson = {
+  cacheKey: string;
+  scenarioPresetId: string;
+  curriculumSectionId: string;
+  level: LessonLevel;
+  lesson: Lesson;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type LessonProgress = {
@@ -98,6 +109,7 @@ export type AppSettings = {
 
 export type AppDatabase = {
   lessons: Lesson[];
+  lessonCache: CachedLesson[];
   progress: LessonProgress[];
   conversationMessages: ConversationMessage[];
   practiceAttempts: PracticeAttempt[];
@@ -109,6 +121,7 @@ export type AppDatabase = {
 export type LessonGenerationInput = {
   topic?: string;
   scenario?: string;
+  scenarioPresetId?: string;
   level?: LessonLevel;
   curriculumSectionId?: string;
 };

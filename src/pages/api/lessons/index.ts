@@ -1,9 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 import {
+  getCachedLesson,
   getCurrentCurriculumSection,
   getSettings,
   listLessons,
+  saveCachedLesson,
   saveLesson,
 } from "@/server/database";
 import {
@@ -36,11 +38,25 @@ export default async function handler(
     try {
       const settings = await getSettings();
       const currentCurriculumSection = await getCurrentCurriculumSection();
+      const curriculumSectionId =
+        body.curriculumSectionId ?? currentCurriculumSection.id;
       const generationInput: LessonGenerationInput = {
         ...body,
-        curriculumSectionId:
-          body.curriculumSectionId ?? currentCurriculumSection.id,
+        curriculumSectionId,
       };
+      if (generationInput.scenarioPresetId) {
+        const cachedLesson = await getCachedLesson({
+          scenarioPresetId: generationInput.scenarioPresetId,
+          curriculumSectionId,
+          level: generationInput.level ?? "beginner",
+        });
+        if (cachedLesson) {
+          await saveLesson(cachedLesson);
+          res.status(200).json({ lesson: cachedLesson, cacheHit: true });
+          return;
+        }
+      }
+
       const lesson = body.useFallback
         ? generateFallbackLesson(generationInput)
         : await generateLessonWithOllama(generationInput, {
@@ -48,8 +64,16 @@ export default async function handler(
             model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
           });
 
+      if (generationInput.scenarioPresetId) {
+        await saveCachedLesson({
+          scenarioPresetId: generationInput.scenarioPresetId,
+          curriculumSectionId,
+          level: lesson.level,
+          lesson,
+        });
+      }
       await saveLesson(lesson);
-      res.status(201).json({ lesson });
+      res.status(201).json({ lesson, cacheHit: false });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not generate lesson.";

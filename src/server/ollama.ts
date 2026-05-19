@@ -184,6 +184,7 @@ function createFallbackLesson(input: LessonGenerationInput): Lesson {
 
   return {
     id: idFromDate("lesson"),
+    scenarioPresetId: input.scenarioPresetId,
     curriculumSectionId: curriculumSection?.id,
     curriculumSectionTitle: curriculumSection?.title,
     curriculumPartTitle: curriculumSection?.partTitle,
@@ -297,6 +298,7 @@ export async function generateLessonWithOllama(
 
   return {
     ...createFallbackLesson(input),
+    scenarioPresetId: input.scenarioPresetId,
     curriculumSectionId: curriculumSection?.id,
     curriculumSectionTitle: curriculumSection?.title,
     curriculumPartTitle: curriculumSection?.partTitle,

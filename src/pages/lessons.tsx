@@ -185,20 +185,54 @@ export default function Lessons() {
     setLastPracticeAttempt(null);
   }
 
-  async function generateLesson(scenarioText: string) {
+  useEffect(() => {
+    if (!currentCurriculumSection) {
+      return;
+    }
+
+    const presets = CONTEXT_PRESETS.filter((ctx) => ctx.scenario !== null).map(
+      (ctx) => ({
+        id: ctx.id,
+        scenario: ctx.scenario,
+      }),
+    );
+    const controller = new AbortController();
+    window.setTimeout(() => {
+      void fetch("/api/lessons/cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level, presets }),
+        signal: controller.signal,
+      }).catch(() => {
+        /* cache warming is best-effort */
+      });
+    }, 250);
+
+    return () => controller.abort();
+  }, [currentCurriculumSection, level]);
+
+  async function generateLesson(scenarioText: string, scenarioPresetId?: string) {
     const trimmed = scenarioText.trim();
     if (!trimmed) {
       setStatus("Describe a situation first.");
       return;
     }
 
-    setStatus("Generating with Ollama...");
+    setStatus(
+      scenarioPresetId
+        ? "Loading cached lesson or generating once..."
+        : "Generating with Ollama...",
+    );
     const response = await fetch("/api/lessons", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scenario: trimmed, level }),
+      body: JSON.stringify({ scenario: trimmed, scenarioPresetId, level }),
     });
-    const data = (await response.json()) as { lesson?: Lesson; error?: string };
+    const data = (await response.json()) as {
+      lesson?: Lesson;
+      error?: string;
+      cacheHit?: boolean;
+    };
 
     if (!response.ok || !data.lesson) {
       setStatus(data.error ?? "Could not generate lesson.");
@@ -420,7 +454,7 @@ export default function Lessons() {
                       setScenario("");
                       return;
                     }
-                    void generateLesson(ctx.scenario);
+                    void generateLesson(ctx.scenario, ctx.id);
                   }}
                   className="group flex flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg shadow-black/20 ring-1 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
                 >
@@ -436,7 +470,7 @@ export default function Lessons() {
                   <span className="mt-4 text-xs font-semibold text-orange-400/90 uppercase">
                     {ctx.scenario === null
                       ? "Describe your scenario"
-                      : "Generate lesson →"}
+                      : "Load lesson →"}
                   </span>
                 </button>
               ))}

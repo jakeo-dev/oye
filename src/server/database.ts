@@ -4,6 +4,7 @@ import path from "node:path";
 import type {
   AppDatabase,
   AppSettings,
+  CachedLesson,
   ConversationMessage,
   CurriculumProgress,
   DailyProgress,
@@ -25,6 +26,7 @@ const databasePath =
 
 const emptyDatabase = (): AppDatabase => ({
   lessons: [],
+  lessonCache: [],
   progress: [],
   conversationMessages: [],
   practiceAttempts: [],
@@ -85,6 +87,72 @@ export async function saveLesson(lesson: Lesson): Promise<Lesson> {
   ];
   await writeDatabase(database);
   return lesson;
+}
+
+export function getLessonCacheKey({
+  scenarioPresetId,
+  curriculumSectionId,
+  level,
+}: {
+  scenarioPresetId: string;
+  curriculumSectionId: string;
+  level: string;
+}): string {
+  return [scenarioPresetId, curriculumSectionId, level].join("::");
+}
+
+export async function getCachedLesson({
+  scenarioPresetId,
+  curriculumSectionId,
+  level,
+}: {
+  scenarioPresetId: string;
+  curriculumSectionId: string;
+  level: string;
+}): Promise<Lesson | null> {
+  const database = await readDatabase();
+  const cacheKey = getLessonCacheKey({
+    scenarioPresetId,
+    curriculumSectionId,
+    level,
+  });
+  return database.lessonCache.find((item) => item.cacheKey === cacheKey)?.lesson ?? null;
+}
+
+export async function saveCachedLesson({
+  scenarioPresetId,
+  curriculumSectionId,
+  level,
+  lesson,
+}: {
+  scenarioPresetId: string;
+  curriculumSectionId: string;
+  level: Lesson["level"];
+  lesson: Lesson;
+}): Promise<CachedLesson> {
+  const database = await readDatabase();
+  const cacheKey = getLessonCacheKey({
+    scenarioPresetId,
+    curriculumSectionId,
+    level,
+  });
+  const existing = database.lessonCache.find((item) => item.cacheKey === cacheKey);
+  const cachedLesson: CachedLesson = {
+    cacheKey,
+    scenarioPresetId,
+    curriculumSectionId,
+    level,
+    lesson,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  database.lessonCache = [
+    cachedLesson,
+    ...database.lessonCache.filter((item) => item.cacheKey !== cacheKey),
+  ];
+  await writeDatabase(database);
+  return cachedLesson;
 }
 
 export async function getCurrentCurriculumSection(): Promise<CurriculumSection> {
