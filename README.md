@@ -51,3 +51,22 @@ Manual prerequisites:
 ## Start Learning
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to start using ¡Oye!
+
+## Local Mac Reminders
+
+Browser reminders work while the app is open. To get local macOS notifications
+after closing the app, install the reminder agent from a cloned repo:
+
+```bash
+./scripts/install-mac-reminders.sh
+```
+
+The agent reads your local `data/app-db.json` file and prioritizes Spanish words
+or phrases you have missed multiple times. Remove it with:
+
+```bash
+./scripts/uninstall-mac-reminders.sh
+```
+
+You can also use the Settings page's "Test Mac notification" button to fire the
+same notification path immediately.

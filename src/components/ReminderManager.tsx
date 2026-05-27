@@ -7,6 +7,13 @@ type SettingsResponse = {
   };
 };
 
+type ReminderResponse = {
+  reminder?: {
+    title?: string;
+    body?: string;
+  };
+};
+
 function msUntilReminder(time: string): number {
   const [hours = "18", minutes = "00"] = time.split(":");
   const target = new Date();
@@ -42,9 +49,23 @@ export default function ReminderManager() {
 
         timeoutId = window.setTimeout(() => {
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("¡Oye! practice reminder", {
-              body: "Spend a few minutes with Spanish today.",
-            });
+            void fetch("/api/reminder")
+              .then((response) => response.json())
+              .then((data: ReminderResponse) => {
+                new Notification(
+                  data.reminder?.title ?? "¡Oye! practice reminder",
+                  {
+                    body:
+                      data.reminder?.body ??
+                      "Spend a few minutes with Spanish today.",
+                  },
+                );
+              })
+              .catch(() => {
+                new Notification("¡Oye! practice reminder", {
+                  body: "Spend a few minutes with Spanish today.",
+                });
+              });
           }
           void scheduleReminder();
         }, msUntilReminder(settings.reminderTime ?? "18:00"));

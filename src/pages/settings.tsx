@@ -262,6 +262,20 @@ export default function Settings() {
     }
   }
 
+  async function testMacReminder() {
+    try {
+      const response = await fetch("/api/reminder", { method: "POST" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not send test notification.");
+      }
+      showToast("Test Mac notification sent.");
+      playSound("success");
+    } catch {
+      showToast("Could not send test Mac notification.");
+    }
+  }
+
   async function clearSavedPreferences() {
     if (
       typeof window !== "undefined" &&
@@ -393,6 +407,27 @@ export default function Settings() {
                 className="mt-3 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50 sm:mt-0 sm:w-44"
                 aria-label="Practice reminder time"
               />
+            </div>
+            <div className="mt-4 border-t border-stone-700/80 pt-4 text-left">
+              <p className="font-semibold text-stone-100">
+                Local Mac reminders
+              </p>
+              <p className="mt-0.5 text-sm leading-relaxed text-stone-400">
+                For reminders after closing the app, install the local macOS
+                reminder agent from this repo. It reads your local practice
+                mistakes and sends a Mac notification at the saved time.
+              </p>
+              <div className="mt-3 space-y-2 rounded-xl border border-stone-700/60 bg-stone-950/50 p-3 font-mono text-xs text-stone-300">
+                <p>./scripts/install-mac-reminders.sh</p>
+                <p>./scripts/uninstall-mac-reminders.sh</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void testMacReminder()}
+                className="mt-3 inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
+              >
+                Test Mac notification
+              </button>
             </div>
           </section>
 
