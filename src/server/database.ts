@@ -11,6 +11,7 @@ import type {
   Lesson,
   LessonProgress,
   PracticeAttempt,
+  PracticeMistake,
 } from "./types";
 
 import {
@@ -30,6 +31,7 @@ const emptyDatabase = (): AppDatabase => ({
   progress: [],
   conversationMessages: [],
   practiceAttempts: [],
+  practiceMistakes: [],
   dailyProgress: [],
   curriculumProgress: [],
   settings: defaultSettings(),
@@ -422,6 +424,7 @@ export async function savePracticeAttempt(
 ): Promise<PracticeAttempt> {
   const database = await readDatabase();
   database.practiceAttempts = [attempt, ...database.practiceAttempts];
+  recordPracticeMistakes(database, attempt);
   const existing = database.progress.find(
     (item) => item.lessonId === attempt.lessonId,
   );
@@ -450,6 +453,32 @@ export async function listPracticeAttempts(
   return database.practiceAttempts.filter(
     (attempt) => lessonId === undefined || attempt.lessonId === lessonId,
   );
+}
+
+export async function getFrequentPracticeMistakes(
+  lessonId?: string,
+  limit = 8,
+): Promise<PracticeMistake[]> {
+  const database = await readDatabase();
+  const mistakes = database.practiceMistakes.filter(
+    (mistake) =>
+      mistake.count >= 2 &&
+      (lessonId === undefined || mistake.lessonId === lessonId),
+  );
+  const fallback =
+    mistakes.length > 0
+      ? mistakes
+      : database.practiceMistakes.filter((mistake) => mistake.count >= 2);
+
+  return fallback
+    .sort((a, b) => {
+      const countDiff = b.count - a.count;
+      if (countDiff !== 0) {
+        return countDiff;
+      }
+      return b.updatedAt.localeCompare(a.updatedAt);
+    })
+    .slice(0, limit);
 }
 
 export async function recordActivity(
@@ -485,6 +514,68 @@ function normalizeSettings(changes: Partial<AppSettings>): Partial<AppSettings> 
     next.ollamaModel = changes.ollamaModel?.trim() || null;
   }
   return next;
+}
+
+function mistakeKey(
+  lessonId: string,
+  kind: PracticeMistake["kind"],
+  text: string,
+): string {
+  return `${lessonId}::${kind}::${text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()}`;
+}
+
+function upsertPracticeMistakeInDatabase(
+  database: AppDatabase,
+  mistake: Omit<PracticeMistake, "key" | "count" | "updatedAt">,
+) {
+  const key = mistakeKey(mistake.lessonId, mistake.kind, mistake.text);
+  const existing = database.practiceMistakes.find((item) => item.key === key);
+  const next: PracticeMistake = {
+    ...mistake,
+    key,
+    count: (existing?.count ?? 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+
+  database.practiceMistakes = [
+    next,
+    ...database.practiceMistakes.filter((item) => item.key !== key),
+  ];
+}
+
+function recordPracticeMistakes(database: AppDatabase, attempt: PracticeAttempt) {
+  if (attempt.score >= 80 && attempt.missedWords.length === 0) {
+    return;
+  }
+
+  const lesson = database.lessons.find((item) => item.id === attempt.lessonId);
+  const curriculumSectionId = lesson?.curriculumSectionId ?? null;
+  upsertPracticeMistakeInDatabase(database, {
+    lessonId: attempt.lessonId,
+    curriculumSectionId,
+    kind: "sentence",
+    text: attempt.prompt,
+    prompt: attempt.prompt,
+    lastScore: attempt.score,
+    lastTranscript: attempt.transcript,
+  });
+
+  for (const missedWord of attempt.missedWords) {
+    upsertPracticeMistakeInDatabase(database, {
+      lessonId: attempt.lessonId,
+      curriculumSectionId,
+      kind: "word",
+      text: missedWord,
+      prompt: attempt.prompt,
+      lastScore: attempt.score,
+      lastTranscript: attempt.transcript,
+    });
+  }
 }
 
 function upsertCurriculumProgressInDatabase(

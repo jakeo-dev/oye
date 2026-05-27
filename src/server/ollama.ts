@@ -9,12 +9,14 @@ import type {
   LessonLevel,
   LessonStep,
   LessonStepKind,
+  PracticeMistake,
   VocabularyItem,
 } from "./types";
 
 type OllamaOptions = {
   baseUrl?: string;
   model?: string;
+  practiceFocus?: PracticeMistake[];
 };
 
 type OllamaGenerateResponse = {
@@ -329,6 +331,19 @@ export async function generateConversationReply(
 ): Promise<string> {
   const { baseUrl, model } = getOllamaConfig(options);
   const curriculumSection = getCurriculumSection(lesson?.curriculumSectionId);
+  const practiceFocus = options.practiceFocus ?? [];
+  const practiceFocusLines =
+    practiceFocus.length > 0
+      ? [
+          "The student has repeatedly missed these items in lesson practice. Work them into the conversation naturally and ask follow-up questions that make the student use them again:",
+          ...practiceFocus.map((item) =>
+            item.kind === "word"
+              ? `- Word: ${item.text} (missed ${item.count} times; original prompt: ${item.prompt})`
+              : `- Sentence: ${item.text} (missed ${item.count} times)`,
+          ),
+          "Prioritize the most repeated missed items, but do not list them mechanically.",
+        ]
+      : [];
   const prompt = [
     "You are a patient Spanish tutor for an English-speaking tourist beginner.",
     "Reply in simple Spanish first, then one concise English hint.",
@@ -343,6 +358,7 @@ export async function generateConversationReply(
       : "",
     lesson ? `Lesson scenario: ${lesson.scenario}` : "Scenario: tourist Spanish practice.",
     lesson ? `Current lesson phrase: ${lesson.spanishPrompt}` : "",
+    ...practiceFocusLines,
     `Student said: ${userText}`,
   ].join("\n");
 

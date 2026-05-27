@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 import {
   clearConversationMessages,
+  getFrequentPracticeMistakes,
   getLesson,
   getSettings,
   listConversationMessages,
@@ -63,9 +64,11 @@ export default async function handler(
 
     try {
       const settings = await getSettings();
+      const practiceFocus = await getFrequentPracticeMistakes(body.lessonId, 8);
       const reply = await generateConversationReply(userText, lesson, {
         baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
         model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
+        practiceFocus,
       });
       const messages = await saveConversationMessages([
         newMessage("user", userText, body.lessonId ?? null),

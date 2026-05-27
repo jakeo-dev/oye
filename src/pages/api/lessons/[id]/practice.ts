@@ -23,14 +23,20 @@ function normalizeForScore(text: string): string[] {
     .filter((word) => word.length > 1);
 }
 
+function uniqueWords(words: string[]): string[] {
+  return [...new Set(words)];
+}
+
 function scoreTranscript(transcript: string, prompt: string) {
   const said = new Set(normalizeForScore(transcript));
   const expected = normalizeForScore(prompt);
+  const missedWords = uniqueWords(expected.filter((word) => !said.has(word)));
 
   if (expected.length === 0) {
     return {
       score: transcript.trim().length > 0 ? 70 : 0,
       feedback: "Saved. Keep practicing with a complete Spanish phrase.",
+      missedWords: [],
     };
   }
 
@@ -38,17 +44,23 @@ function scoreTranscript(transcript: string, prompt: string) {
   const score = Math.round((matched / expected.length) * 100);
 
   if (score >= 80) {
-    return { score, feedback: "Strong match. Nice work with the key phrase." };
+    return {
+      score,
+      feedback: "Strong match. Nice work with the key phrase.",
+      missedWords,
+    };
   }
   if (score >= 50) {
     return {
       score,
       feedback: "Good start. Try again and include more of the key words.",
+      missedWords,
     };
   }
   return {
     score,
     feedback: "Saved. Listen once more, then repeat the full Spanish line.",
+    missedWords,
   };
 }
 
@@ -101,6 +113,7 @@ export default async function handler(
       transcript,
       score: result.score,
       feedback: result.feedback,
+      missedWords: result.missedWords,
       createdAt: new Date().toISOString(),
     };
 

@@ -70,7 +70,21 @@ export type PracticeAttempt = {
   transcript: string;
   score: number;
   feedback: string;
+  missedWords: string[];
   createdAt: string;
+};
+
+export type PracticeMistake = {
+  key: string;
+  lessonId: string;
+  curriculumSectionId: string | null;
+  kind: "word" | "sentence";
+  text: string;
+  prompt: string;
+  count: number;
+  lastScore: number;
+  lastTranscript: string;
+  updatedAt: string;
 };
 
 export type ConversationMessage = {
@@ -113,6 +127,7 @@ export type AppDatabase = {
   progress: LessonProgress[];
   conversationMessages: ConversationMessage[];
   practiceAttempts: PracticeAttempt[];
+  practiceMistakes: PracticeMistake[];
   dailyProgress: DailyProgress[];
   curriculumProgress: CurriculumProgress[];
   settings: AppSettings;
