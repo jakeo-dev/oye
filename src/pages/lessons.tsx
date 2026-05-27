@@ -23,6 +23,7 @@ import type {
   PracticeAttempt,
 } from "@/server/types";
 import type { CurriculumSection } from "@/lib/curriculum";
+import Image from "next/image";
 
 import { resolveLessonSteps } from "@/lib/lessonSteps";
 import { useSoundEffect } from "@/hooks/useSoundEffect";
@@ -215,7 +216,10 @@ export default function Lessons() {
     return () => controller.abort();
   }, [currentCurriculumSection, level]);
 
-  async function generateLesson(scenarioText: string, scenarioPresetId?: string) {
+  async function generateLesson(
+    scenarioText: string,
+    scenarioPresetId?: string,
+  ) {
     const trimmed = scenarioText.trim();
     if (!trimmed) {
       setStatus("Describe a situation first.");
@@ -429,7 +433,7 @@ export default function Lessons() {
       <div className="relative mx-auto flex w-full max-w-220 flex-col gap-6 px-8 py-12">
         {phase === "pick-context" ? (
           <>
-            <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg shadow-black/25 ring-1 ring-white/5 backdrop-blur-sm sm:p-7">
+            <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg ring-1 shadow-black/25 ring-white/5 backdrop-blur-sm sm:p-7">
               <div
                 className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
                 aria-hidden
@@ -437,11 +441,13 @@ export default function Lessons() {
               <p className="text-xs font-semibold tracking-[0.2em] text-orange-400/90 uppercase">
                 Lessons
               </p>
-              <h1 className="mt-3 text-pretty text-2xl leading-tight font-black tracking-tight text-white sm:text-3xl md:text-4xl">
+              <h1 className="mt-3 text-2xl leading-tight font-black tracking-tight text-pretty text-white sm:text-3xl md:text-4xl">
                 Pick a real-life context
               </h1>
               <p className="mt-3 max-w-2xl text-pretty text-stone-400">
-                Choose where you’ll use Spanish. The app builds a short lesson—overview, vocabulary, grammar, a key phrase, and practice—using the same AI as the generate button.
+                Choose where you’ll use Spanish. The app builds a short
+                lesson—overview, vocabulary, grammar, a key phrase, and
+                practice—using the same AI as the generate button.
               </p>
               {currentCurriculumSection ? (
                 <div className="mt-5 rounded-xl border border-orange-400/25 bg-orange-400/10 p-4 text-left">
@@ -502,7 +508,7 @@ export default function Lessons() {
                   {(
                     [
                       { id: "beginner", label: "Beginner" },
-                      { id: "upper-beginner", label: "Upper beginner" },
+                      { id: "upper-beginner", label: "Intermediate" },
                     ] as const
                   ).map((opt) => (
                     <button
@@ -522,37 +528,51 @@ export default function Lessons() {
               </fieldset>
             </section>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {CONTEXT_PRESETS.map((ctx) => (
-                <button
-                  key={ctx.id}
-                  type="button"
-                  onClick={() => {
-                    if (ctx.scenario === null) {
-                      setPhase("custom-details");
-                      setScenario("");
-                      return;
-                    }
-                    void generateLesson(ctx.scenario, ctx.id);
-                  }}
-                  className="group flex flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg shadow-black/20 ring-1 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
-                >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-400/12 text-orange-300 transition group-hover:bg-orange-400/20">
-                    <FontAwesomeIcon icon={ctx.icon} className="text-lg" />
-                  </span>
-                  <span className="mt-4 text-lg font-black text-white">
-                    {ctx.label}
-                  </span>
-                  <span className="mt-1 text-sm text-stone-400">
-                    {ctx.description}
-                  </span>
-                  <span className="mt-4 text-xs font-semibold text-orange-400/90 uppercase">
-                    {ctx.scenario === null
-                      ? "Describe your scenario"
-                      : "Load lesson →"}
-                  </span>
-                </button>
-              ))}
+            <div className="flex flex-row gap-8 md:gap-12">
+              <div className="grid flex-1 gap-4 sm:grid-cols-1">
+                {CONTEXT_PRESETS.map((ctx) => (
+                  <button
+                    key={ctx.id}
+                    type="button"
+                    onClick={() => {
+                      if (ctx.scenario === null) {
+                        setPhase("custom-details");
+                        setScenario("");
+                        return;
+                      }
+                      void generateLesson(ctx.scenario, ctx.id);
+                    }}
+                    className="group flex flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
+                  >
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-400/12 text-orange-300 transition group-hover:bg-orange-400/20">
+                      <FontAwesomeIcon icon={ctx.icon} className="text-lg" />
+                    </span>
+                    <span className="mt-4 text-lg font-black text-white">
+                      {ctx.label}
+                    </span>
+                    <span className="mt-1 text-sm text-stone-400">
+                      {ctx.description}
+                    </span>
+                    <span className="mt-4 text-xs font-semibold text-orange-400/90 uppercase">
+                      {ctx.scenario === null
+                        ? "Create scenario →"
+                        : "Load lesson →"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="animate-wiggle-less relative h-min">
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-px" />
+                <Image
+                  src="/oye-tura-the-criatura-hat4.png"
+                  width={600}
+                  height={800}
+                  alt="Tura the Criatura"
+                  className="mx-auto w-full max-w-xs object-contain drop-shadow-2xl drop-shadow-orange-300/30 sm:min-w-xs"
+                  priority
+                />
+              </div>
             </div>
 
             {lastLessonId ? (
@@ -578,19 +598,20 @@ export default function Lessons() {
         ) : null}
 
         {phase === "custom-details" ? (
-          <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-1 ring-white/5 sm:p-6">
+          <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
             <h2 className="text-sm font-semibold tracking-wide text-stone-400">
               Custom scenario
             </h2>
             <p className="mt-2 text-sm text-stone-500">
-              Describe the situation in English. The model turns it into vocabulary, grammar notes, and a phrase you can practice.
+              Describe the situation in English. The model turns it into
+              vocabulary, grammar notes, and a phrase you can practice.
             </p>
             <div className="mt-4 flex flex-col gap-3">
               <textarea
                 value={scenario}
                 onChange={(e) => setScenario(e.target.value)}
                 rows={4}
-                className="min-h-28 w-full resize-y rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                className="min-h-28 w-full resize-y rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-3 text-stone-100 transition outline-none placeholder:text-stone-500 focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
                 placeholder="e.g. Renting a bike and asking about helmets…"
                 aria-label="Custom lesson scenario"
               />
@@ -600,7 +621,7 @@ export default function Lessons() {
                   onClick={() => {
                     void generateLesson(scenario);
                   }}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:px-8"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 transition outline-none hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:px-8"
                 >
                   <FontAwesomeIcon
                     icon={faWandMagicSparkles}
@@ -630,7 +651,7 @@ export default function Lessons() {
 
         {phase === "lesson" && lesson ? (
           <>
-            <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg shadow-black/25 ring-1 ring-white/5 backdrop-blur-sm sm:p-7">
+            <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg ring-1 shadow-black/25 ring-white/5 backdrop-blur-sm sm:p-7">
               <div
                 className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
                 aria-hidden
@@ -665,9 +686,7 @@ export default function Lessons() {
                     Step {stepIndex + 1} of {steps.length}
                   </span>
                   <span className="rounded-full bg-stone-800/80 px-2 py-0.5 font-semibold text-orange-200/90">
-                    {currentStep
-                      ? stepKindLabel(currentStep.kind)
-                      : "Step"}
+                    {currentStep ? stepKindLabel(currentStep.kind) : "Step"}
                   </span>
                 </div>
                 <div
@@ -681,9 +700,7 @@ export default function Lessons() {
                     <span
                       key={i}
                       className={`h-full min-w-6 flex-1 rounded-full transition ${
-                        i <= stepIndex
-                          ? "bg-orange-400/70"
-                          : "bg-stone-700/80"
+                        i <= stepIndex ? "bg-orange-400/70" : "bg-stone-700/80"
                       }`}
                     />
                   ))}
@@ -696,12 +713,12 @@ export default function Lessons() {
                     {currentStep.title}
                   </h2>
                   {currentStep.body ? (
-                    <p className="mt-3 text-pretty leading-relaxed whitespace-pre-line text-stone-300">
+                    <p className="mt-3 leading-relaxed text-pretty whitespace-pre-line text-stone-300">
                       {currentStep.body}
                     </p>
                   ) : null}
 
-                  {(currentStep.spanish || currentStep.english) ? (
+                  {currentStep.spanish || currentStep.english ? (
                     <div className="mt-5 flex flex-col gap-2 rounded-xl border border-stone-700/60 bg-stone-950/40 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                       {currentStep.spanish ? (
                         <p className="text-lg font-bold text-orange-100">
@@ -738,15 +755,13 @@ export default function Lessons() {
                     <button
                       type="button"
                       onClick={() => toggleSpeakPrompt()}
-                      className={`flex h-11 w-11 items-center justify-center rounded-full border bg-stone-800/80 outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
+                      className={`flex h-11 w-11 items-center justify-center rounded-full border bg-stone-800/80 transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
                         isSpeakingPrompt
                           ? "border-orange-400/50 text-orange-200 hover:border-orange-300/60 hover:bg-orange-400/15"
                           : "border-stone-600/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
                       }`}
                       aria-label={
-                        isSpeakingPrompt
-                          ? "Stop reading aloud"
-                          : "Read aloud"
+                        isSpeakingPrompt ? "Stop reading aloud" : "Read aloud"
                       }
                     >
                       <FontAwesomeIcon
@@ -764,13 +779,14 @@ export default function Lessons() {
                       Your turn — say it
                     </h3>
                     <p className="mt-2 text-sm text-stone-400">
-                      Use the microphone or type. Try the Spanish words or sentences from this step.
+                      Use the microphone or type. Try the Spanish words or
+                      sentences from this step.
                     </p>
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-stretch">
                       <button
                         type="button"
                         onClick={toggleListening}
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-full border font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
                           isListening
                             ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
                             : "border-stone-600/80 bg-stone-800/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
@@ -790,7 +806,7 @@ export default function Lessons() {
                           setStepSpeechText(e.target.value);
                           setLastPracticeAttempt(null);
                         }}
-                        className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-2.5 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                        className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-2.5 text-stone-100 transition outline-none placeholder:text-stone-500 focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
                         placeholder="What you said appears here…"
                         aria-label="Transcript of your Spanish practice"
                       />
@@ -845,7 +861,10 @@ export default function Lessons() {
                 >
                   {isLastStep ? "Finish" : "Next"}
                   {isLastStep ? null : (
-                    <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      className="text-xs"
+                    />
                   )}
                 </button>
               </div>
@@ -853,7 +872,7 @@ export default function Lessons() {
 
             {lesson.practiceQuestions.length > 0 &&
             currentStep?.kind === "practice" ? (
-              <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-1 ring-white/5 sm:p-6">
+              <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
                 <h3 className="text-xs font-semibold tracking-[0.18em] text-orange-400/90 uppercase">
                   Extra prompts
                 </h3>

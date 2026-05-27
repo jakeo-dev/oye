@@ -132,14 +132,14 @@ export default function Home() {
               className="absolute inset-6 -z-10 rounded-[2.5rem] bg-linear-to-br from-orange-500/25 via-stone-800/40 to-stone-950 blur-2xl"
               aria-hidden
             />
-            <div className="relative rounded-4xl border border-stone-700/60 bg-linear-to-b from-stone-900/80 to-stone-950/90 p-8 shadow-2xl ring-1 shadow-black/50 ring-white/5 backdrop-blur-sm sm:p-10">
-              <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent" />
+            <div className="animate-wiggle relative p-6">
+              <div className="pointer-events-none absolute inset-x-8 top-0 h-px" />
               <Image
-                src="/mascot.png"
+                src="/oye-tura-the-criatura.png"
                 width={360}
                 height={420}
-                alt="Spanish app mascot"
-                className="mx-auto h-auto w-full max-w-xs object-contain drop-shadow-2xl sm:max-w-sm"
+                alt="Tura the Criatura"
+                className="mx-auto h-auto w-full max-w-xs object-contain drop-shadow-2xl drop-shadow-orange-300/30 sm:max-w-sm"
                 priority
               />
             </div>

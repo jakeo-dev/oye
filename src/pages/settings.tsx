@@ -11,6 +11,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Host_Grotesk } from "next/font/google";
 
+import Image from "next/image";
+
 import { useSoundEffect } from "@/hooks/useSoundEffect";
 
 const hostGrotesk = Host_Grotesk({
@@ -135,21 +137,24 @@ export default function Settings() {
     return () => window.clearTimeout(timeoutId);
   }, [loadSettings]);
 
-  const patchSettings = useCallback(async (changes: Record<string, unknown>) => {
-    const response = await fetch("/api/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(changes),
-    });
-    const data = (await response.json()) as OllamaSettings;
-    if (!response.ok) {
-      throw new Error("Could not save settings.");
-    }
-    applySettings(data);
-    window.dispatchEvent(new Event("oye:settings-updated"));
-    window.dispatchEvent(new Event("oye:progress-updated"));
-    return data;
-  }, [applySettings]);
+  const patchSettings = useCallback(
+    async (changes: Record<string, unknown>) => {
+      const response = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes),
+      });
+      const data = (await response.json()) as OllamaSettings;
+      if (!response.ok) {
+        throw new Error("Could not save settings.");
+      }
+      applySettings(data);
+      window.dispatchEvent(new Event("oye:settings-updated"));
+      window.dispatchEvent(new Event("oye:progress-updated"));
+      return data;
+    },
+    [applySettings],
+  );
 
   async function saveOllamaSettings() {
     try {
@@ -410,68 +415,89 @@ export default function Settings() {
           </section>
 
           <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
-            <div className="flex items-center gap-3">
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400"
-                aria-hidden
-              >
-                <FontAwesomeIcon icon={faDatabase} className="text-lg" />
-              </span>
-              <h2 className="text-lg font-black tracking-tight text-white">
-                Ollama backend
-              </h2>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-stone-400">
-              Save model settings without restarting Next.js. Environment
-              variables remain the fallback when these fields are blank.
-            </p>
-            <div className="mt-4 space-y-4 rounded-xl border border-stone-700/60 bg-stone-950/50 p-4 text-sm">
+            <div className="flex flex-col gap-8 md:flex-row md:gap-12">
               <div>
-                <label
-                  className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
-                  htmlFor="ollama-base-url"
-                >
-                  Base URL
-                </label>
-                <input
-                  id="ollama-base-url"
-                  value={ollamaBaseUrl}
-                  onChange={(e) => setOllamaBaseUrl(e.target.value)}
-                  className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
-                  placeholder={settings?.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434"}
-                />
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400"
+                    aria-hidden
+                  >
+                    <FontAwesomeIcon icon={faDatabase} className="text-lg" />
+                  </span>
+                  <h2 className="text-lg font-black tracking-tight text-white">
+                    Ollama backend
+                  </h2>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-stone-400">
+                  Save model settings without restarting Next.js. Environment
+                  variables remain the fallback when these fields are blank.
+                </p>
+                <div className="mt-4 space-y-4 rounded-xl border border-stone-700/60 bg-stone-950/50 p-4 text-sm">
+                  <div>
+                    <label
+                      className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
+                      htmlFor="ollama-base-url"
+                    >
+                      Base URL
+                    </label>
+                    <input
+                      id="ollama-base-url"
+                      value={ollamaBaseUrl}
+                      onChange={(e) => setOllamaBaseUrl(e.target.value)}
+                      className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                      placeholder={
+                        settings?.env.OLLAMA_BASE_URL ??
+                        "http://127.0.0.1:11434"
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
+                      htmlFor="ollama-model"
+                    >
+                      Model
+                    </label>
+                    <input
+                      id="ollama-model"
+                      value={ollamaModel}
+                      onChange={(e) => setOllamaModel(e.target.value)}
+                      className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                      placeholder={settings?.env.OLLAMA_MODEL ?? "llama3.2"}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => void saveOllamaSettings()}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300"
+                    >
+                      <FontAwesomeIcon
+                        icon={faFloppyDisk}
+                        className="text-sm"
+                      />
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void testOllamaSettings()}
+                      className="inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
+                    >
+                      Test
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label
-                  className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
-                  htmlFor="ollama-model"
-                >
-                  Model
-                </label>
-                <input
-                  id="ollama-model"
-                  value={ollamaModel}
-                  onChange={(e) => setOllamaModel(e.target.value)}
-                  className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
-                  placeholder={settings?.env.OLLAMA_MODEL ?? "llama3.2"}
+              <div className="animate-wiggle-less relative h-min">
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-px" />
+                <Image
+                  src="/oye-tura-the-criatura-hat3.png"
+                  width={400}
+                  height={500}
+                  alt="Tura the Criatura"
+                  className="mx-auto w-full max-w-xs object-contain drop-shadow-2xl drop-shadow-orange-300/30 sm:min-w-2xs"
+                  priority
                 />
-              </div>
-              <div className="flex flex-wrap gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => void saveOllamaSettings()}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300"
-                >
-                  <FontAwesomeIcon icon={faFloppyDisk} className="text-sm" />
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void testOllamaSettings()}
-                  className="inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
-                >
-                  Test
-                </button>
               </div>
             </div>
           </section>

@@ -32,3 +32,27 @@
   border-top-right-radius: 999px;
   border-bottom-right-radius: 999px;
 }
+
+@theme {
+  --animate-wiggle: wiggle 6s ease-in-out infinite;
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(-2deg);
+    }
+    50% {
+      transform: rotate(2deg);
+    }
+  }
+
+  --animate-wiggle-less: wiggle 10s ease-in-out infinite;
+  @keyframes wiggle-less {
+    0%,
+    100% {
+      transform: rotate(-1.5deg);
+    }
+    50% {
+      transform: rotate(1.5deg);
+    }
+  }
+}
