@@ -16,6 +16,7 @@ import Image from "next/image";
 
 import {
   AI_RESPONSE_FLAVORS,
+  DEFAULT_CUSTOM_AI_INSTRUCTIONS,
   DEFAULT_AI_RESPONSE_FLAVOR,
 } from "@/lib/aiFlavors";
 import type { AiResponseFlavor } from "@/lib/aiFlavors";
@@ -39,6 +40,7 @@ type OllamaSettings = {
     ollamaBaseUrl: string | null;
     ollamaModel: string | null;
     aiResponseFlavor: AiResponseFlavor;
+    customAiInstructions: string;
   };
   env: Record<string, string>;
 };
@@ -115,6 +117,9 @@ export default function Settings() {
   const [aiResponseFlavor, setAiResponseFlavor] = useState<AiResponseFlavor>(
     DEFAULT_AI_RESPONSE_FLAVOR,
   );
+  const [customAiInstructions, setCustomAiInstructions] = useState(
+    DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+  );
   const [toast, setToast] = useState<string | null>(null);
   const playSound = useSoundEffect();
 
@@ -128,6 +133,9 @@ export default function Settings() {
     setOllamaModel(data.settings.ollamaModel ?? data.ollama.model);
     setAiResponseFlavor(
       data.settings.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
+    );
+    setCustomAiInstructions(
+      data.settings.customAiInstructions ?? DEFAULT_CUSTOM_AI_INSTRUCTIONS,
     );
   }, []);
 
@@ -289,6 +297,20 @@ export default function Settings() {
     }
   }
 
+  async function persistCustomAiInstructions() {
+    try {
+      const trimmed = customAiInstructions.trim();
+      await patchSettings({ customAiInstructions: trimmed });
+      setCustomAiInstructions(trimmed);
+      showToast(
+        trimmed ? "Custom AI instructions saved." : "Custom AI instructions cleared.",
+      );
+      playSound("tap");
+    } catch {
+      showToast("Could not save custom AI instructions.");
+    }
+  }
+
   async function testMacReminder() {
     try {
       const response = await fetch("/api/reminder", { method: "POST" });
@@ -321,6 +343,7 @@ export default function Settings() {
         ollamaBaseUrl: null,
         ollamaModel: null,
         aiResponseFlavor: DEFAULT_AI_RESPONSE_FLAVOR,
+        customAiInstructions: DEFAULT_CUSTOM_AI_INSTRUCTIONS,
       });
       showToast("Preferences cleared.");
     } catch {
@@ -515,6 +538,61 @@ export default function Settings() {
                   </p>
                 </div>
               ))}
+            </div>
+            <div className="mt-5 border-t border-stone-700/80 pt-5 text-left">
+              <label
+                className="text-sm font-bold text-stone-100"
+                htmlFor="custom-ai-instructions"
+              >
+                Custom instructions
+              </label>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-stone-400">
+                Add your own style notes for Ask answers and newly generated
+                lessons.
+              </p>
+              <textarea
+                id="custom-ai-instructions"
+                value={customAiInstructions}
+                onChange={(e) => setCustomAiInstructions(e.target.value)}
+                onBlur={() => void persistCustomAiInstructions()}
+                disabled={!mounted}
+                rows={4}
+                maxLength={1000}
+                className="mt-3 min-h-28 w-full resize-y rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50"
+                placeholder="Example: Keep answers extra short, use Spain Spanish, and include pronunciation tips."
+              />
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-stone-500">
+                  {customAiInstructions.length}/1000 characters
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomAiInstructions(DEFAULT_CUSTOM_AI_INSTRUCTIONS);
+                      void patchSettings({
+                        customAiInstructions: DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+                      })
+                        .then(() => showToast("Custom AI instructions cleared."))
+                        .catch(() =>
+                          showToast("Could not clear custom AI instructions."),
+                        );
+                    }}
+                    disabled={!mounted || !customAiInstructions.trim()}
+                    className="inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void persistCustomAiInstructions()}
+                    disabled={!mounted}
+                    className="inline-flex items-center justify-center rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Save instructions
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 

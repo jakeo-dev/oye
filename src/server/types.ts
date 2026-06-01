@@ -122,6 +122,7 @@ export type AppSettings = {
   ollamaBaseUrl: string | null;
   ollamaModel: string | null;
   aiResponseFlavor: AiResponseFlavor;
+  customAiInstructions: string;
 };
 
 export type AppDatabase = {

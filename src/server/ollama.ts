@@ -3,6 +3,8 @@ import { getCurriculumSection } from "@/lib/curriculum";
 import type { CurriculumSection } from "@/lib/curriculum";
 import {
   DEFAULT_AI_RESPONSE_FLAVOR,
+  DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+  getCustomAiInstructionLine,
   getAiFlavorInstruction,
 } from "@/lib/aiFlavors";
 import type { AiResponseFlavor } from "@/lib/aiFlavors";
@@ -23,6 +25,7 @@ type OllamaOptions = {
   model?: string;
   practiceFocus?: PracticeMistake[];
   aiResponseFlavor?: AiResponseFlavor;
+  customAiInstructions?: string;
 };
 
 type OllamaGenerateResponse = {
@@ -215,12 +218,15 @@ function buildLessonPrompt({
   level,
   scenario,
   aiResponseFlavor,
+  customAiInstructions,
 }: {
   curriculumSection: CurriculumSection | null;
   level: LessonLevel;
   scenario: string;
   aiResponseFlavor: AiResponseFlavor;
+  customAiInstructions: string;
 }): string {
+  const customInstructionLine = getCustomAiInstructionLine(customAiInstructions);
   const curriculumLines = curriculumSection
     ? [
         `Curriculum part: ${curriculumSection.partTitle}`,
@@ -245,6 +251,7 @@ function buildLessonPrompt({
     "Rules for steps: use kind overview first (set expectations), then vocabulary (include words array), grammar (explain the curriculum section clearly; spanish/english optional), phrase (key line in spanish + english), practice last (body with 2-4 prompts, no need for spanish field).",
     "Omit optional fields when empty.",
     `AI response flavor: ${getAiFlavorInstruction(aiResponseFlavor)}`,
+    customInstructionLine ?? "",
     `Level: ${level}`,
     `Scenario: ${scenario}`,
     "Keep Spanish natural, practical, and beginner friendly.",
@@ -264,6 +271,8 @@ export async function generateLessonWithOllama(
     level,
     scenario,
     aiResponseFlavor: options.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
+    customAiInstructions:
+      options.customAiInstructions ?? DEFAULT_CUSTOM_AI_INSTRUCTIONS,
   });
 
   const response = await fetch(`${baseUrl}/api/generate`, {
@@ -405,6 +414,9 @@ export async function generateTravelAnswer(
     `AI response flavor: ${getAiFlavorInstruction(
       options.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
     )}`,
+    getCustomAiInstructionLine(
+      options.customAiInstructions ?? DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+    ) ?? "",
     "Do not claim access to live information, maps, prices, schedules, laws, or current events. If the answer depends on current local facts, say that you cannot verify that offline and give language help instead.",
     `Question: ${question}`,
   ].join("\n");

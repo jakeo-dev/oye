@@ -23,6 +23,8 @@ import {
 import type { CurriculumSection } from "@/lib/curriculum";
 import {
   DEFAULT_AI_RESPONSE_FLAVOR,
+  DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+  normalizeCustomAiInstructions,
   normalizeAiResponseFlavor,
 } from "@/lib/aiFlavors";
 import type { AiResponseFlavor } from "@/lib/aiFlavors";
@@ -51,6 +53,7 @@ function defaultSettings(): AppSettings {
     ollamaBaseUrl: null,
     ollamaModel: null,
     aiResponseFlavor: DEFAULT_AI_RESPONSE_FLAVOR,
+    customAiInstructions: DEFAULT_CUSTOM_AI_INSTRUCTIONS,
   };
 }
 
@@ -102,15 +105,21 @@ export function getLessonCacheKey({
   curriculumSectionId,
   level,
   aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
+  customAiInstructions = DEFAULT_CUSTOM_AI_INSTRUCTIONS,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: string;
   aiResponseFlavor?: AiResponseFlavor;
+  customAiInstructions?: string;
 }): string {
-  return [scenarioPresetId, curriculumSectionId, level, aiResponseFlavor].join(
-    "::",
-  );
+  return JSON.stringify([
+    scenarioPresetId,
+    curriculumSectionId,
+    level,
+    aiResponseFlavor,
+    normalizeCustomAiInstructions(customAiInstructions),
+  ]);
 }
 
 export async function getCachedLesson({
@@ -118,11 +127,13 @@ export async function getCachedLesson({
   curriculumSectionId,
   level,
   aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
+  customAiInstructions = DEFAULT_CUSTOM_AI_INSTRUCTIONS,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: string;
   aiResponseFlavor?: AiResponseFlavor;
+  customAiInstructions?: string;
 }): Promise<Lesson | null> {
   const database = await readDatabase();
   const cacheKey = getLessonCacheKey({
@@ -130,6 +141,7 @@ export async function getCachedLesson({
     curriculumSectionId,
     level,
     aiResponseFlavor,
+    customAiInstructions,
   });
   return database.lessonCache.find((item) => item.cacheKey === cacheKey)?.lesson ?? null;
 }
@@ -139,12 +151,14 @@ export async function saveCachedLesson({
   curriculumSectionId,
   level,
   aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
+  customAiInstructions = DEFAULT_CUSTOM_AI_INSTRUCTIONS,
   lesson,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: Lesson["level"];
   aiResponseFlavor?: AiResponseFlavor;
+  customAiInstructions?: string;
   lesson: Lesson;
 }): Promise<CachedLesson> {
   const database = await readDatabase();
@@ -153,6 +167,7 @@ export async function saveCachedLesson({
     curriculumSectionId,
     level,
     aiResponseFlavor,
+    customAiInstructions,
   });
   const existing = database.lessonCache.find((item) => item.cacheKey === cacheKey);
   const cachedLesson: CachedLesson = {
@@ -531,6 +546,14 @@ function normalizeSettings(changes: Partial<AppSettings>): Partial<AppSettings> 
   }
   if (changes.aiResponseFlavor) {
     next.aiResponseFlavor = normalizeAiResponseFlavor(changes.aiResponseFlavor);
+  }
+  if (
+    changes.customAiInstructions === null ||
+    typeof changes.customAiInstructions === "string"
+  ) {
+    next.customAiInstructions = normalizeCustomAiInstructions(
+      changes.customAiInstructions,
+    );
   }
   return next;
 }

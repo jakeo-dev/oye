@@ -39,6 +39,8 @@ export const AI_RESPONSE_FLAVORS = [
 export type AiResponseFlavor = (typeof AI_RESPONSE_FLAVORS)[number]["id"];
 
 export const DEFAULT_AI_RESPONSE_FLAVOR: AiResponseFlavor = "friendly-coach";
+export const DEFAULT_CUSTOM_AI_INSTRUCTIONS = "";
+const MAX_CUSTOM_AI_INSTRUCTIONS_LENGTH = 1000;
 
 export function normalizeAiResponseFlavor(value: unknown): AiResponseFlavor {
   return AI_RESPONSE_FLAVORS.some((flavor) => flavor.id === value)
@@ -52,4 +54,16 @@ export function getAiFlavorInstruction(flavor: unknown): string {
     AI_RESPONSE_FLAVORS.find((item) => item.id === normalized)?.instruction ??
     AI_RESPONSE_FLAVORS[0].instruction
   );
+}
+
+export function normalizeCustomAiInstructions(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_CUSTOM_AI_INSTRUCTIONS;
+  }
+  return value.trim().slice(0, MAX_CUSTOM_AI_INSTRUCTIONS_LENGTH);
+}
+
+export function getCustomAiInstructionLine(value: unknown): string | null {
+  const instruction = normalizeCustomAiInstructions(value);
+  return instruction ? `Custom user instruction: ${instruction}` : null;
 }

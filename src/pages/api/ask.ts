@@ -31,6 +31,7 @@ export default async function handler(
       baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
       model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
       aiResponseFlavor: settings.aiResponseFlavor,
+      customAiInstructions: settings.customAiInstructions,
     });
 
     res.status(200).json({ answer });
