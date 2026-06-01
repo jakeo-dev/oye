@@ -2,7 +2,11 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faBookOpen } from "@fortawesome/free-solid-svg-icons";
+import {
+  faArrowRight,
+  faBookOpen,
+  faCircleQuestion,
+} from "@fortawesome/free-solid-svg-icons";
 
 import { Host_Grotesk } from "next/font/google";
 const hostGrotesk = Host_Grotesk({
@@ -92,6 +96,12 @@ export default function Home() {
               title="Lessons"
               description="Guided phrases, grammar, and scenarios you can study at your own pace."
               icon={faBookOpen}
+            />
+            <NavCard
+              href="/ask"
+              title="Ask"
+              description="Type a travel question in English or Spanish and get a local answer."
+              icon={faCircleQuestion}
             />
           </nav>
         </div>

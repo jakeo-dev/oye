@@ -1,0 +1,229 @@
+import { useEffect, useRef, useState } from "react";
+
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCircleQuestion,
+  faPaperPlane,
+  faTrash,
+} from "@fortawesome/free-solid-svg-icons";
+
+import { Host_Grotesk } from "next/font/google";
+const hostGrotesk = Host_Grotesk({
+  variable: "--font-host-grotesk",
+  subsets: ["latin"],
+});
+
+type AskMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
+
+function TypingIndicator() {
+  return (
+    <div
+      className="max-w-[min(100%,34rem)] self-start rounded-2xl border border-stone-600/80 bg-stone-800/70 px-5 py-3.5"
+      role="status"
+      aria-label="Answer is loading"
+    >
+      <span className="inline-flex items-center gap-1.5" aria-hidden>
+        <span
+          className="inline-block h-2 w-2 rounded-full bg-orange-300/90 motion-safe:animate-bounce"
+          style={{ animationDuration: "0.9s", animationDelay: "0ms" }}
+        />
+        <span
+          className="inline-block h-2 w-2 rounded-full bg-orange-300/90 motion-safe:animate-bounce"
+          style={{ animationDuration: "0.9s", animationDelay: "150ms" }}
+        />
+        <span
+          className="inline-block h-2 w-2 rounded-full bg-orange-300/90 motion-safe:animate-bounce"
+          style={{ animationDuration: "0.9s", animationDelay: "300ms" }}
+        />
+      </span>
+    </div>
+  );
+}
+
+function newMessage(role: AskMessage["role"], content: string): AskMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+  };
+}
+
+export default function Ask() {
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<AskMessage[]>([]);
+  const [status, setStatus] = useState("");
+  const [isAwaitingAnswer, setIsAwaitingAnswer] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isAwaitingAnswer]);
+
+  async function askQuestion() {
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion || isAwaitingAnswer) {
+      return;
+    }
+
+    setMessages((current) => [
+      ...current,
+      newMessage("user", trimmedQuestion),
+    ]);
+    setQuestion("");
+    setStatus("");
+    setIsAwaitingAnswer(true);
+
+    try {
+      const response = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: trimmedQuestion }),
+      });
+      const data = (await response.json()) as {
+        answer?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !data.answer) {
+        setStatus(data.error ?? "Could not get an answer.");
+        return;
+      }
+
+      setMessages((current) => [
+        ...current,
+        newMessage("assistant", data.answer ?? ""),
+      ]);
+    } finally {
+      setIsAwaitingAnswer(false);
+    }
+  }
+
+  return (
+    <div
+      className={`${hostGrotesk.className} relative isolate min-h-[calc(100dvh-5.5rem)] overflow-hidden bg-stone-950 text-stone-100`}
+    >
+      <div
+        className="pointer-events-none absolute -top-24 right-0 h-72 w-72 rounded-full bg-orange-500/15 blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 left-0 h-64 w-64 rounded-full bg-orange-600/8 blur-3xl"
+        aria-hidden
+      />
+
+      <div className="relative mx-auto flex w-full max-w-220 flex-col px-8 py-12">
+        <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg shadow-black/25 ring-1 ring-white/5 backdrop-blur-sm sm:p-7">
+          <div
+            className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
+            aria-hidden
+          />
+          <p className="text-xs font-semibold tracking-[0.2em] text-orange-400/90 uppercase">
+            Offline answers
+          </p>
+          <div className="mt-3 flex items-start gap-4">
+            <div
+              className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400 sm:flex"
+              aria-hidden
+            >
+              <FontAwesomeIcon icon={faCircleQuestion} className="text-xl" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-pretty text-2xl leading-tight font-black tracking-tight text-white sm:text-3xl md:text-4xl">
+                Ask how to say it or what it means
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-stone-400 sm:text-base">
+                Type in English or Spanish for practical travel translations,
+                meanings, and quick language help.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <main className="mt-6 flex min-h-0 flex-1 flex-col gap-5">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setMessages([]);
+                setStatus("");
+              }}
+              disabled={messages.length === 0 || isAwaitingAnswer}
+              aria-label="Clear answers"
+              className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-sm font-bold text-stone-100 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
+            >
+              <FontAwesomeIcon icon={faTrash} aria-hidden="true" />
+              Clear
+            </button>
+          </div>
+
+          <div
+            className="flex max-h-[min(52vh,28rem)] min-h-52 flex-col gap-3 overflow-y-auto rounded-2xl border border-stone-700/60 bg-stone-900/30 p-4 ring-1 ring-white/5 sm:p-5"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+          >
+            {messages.length === 0 && !isAwaitingAnswer ? (
+              <p className="m-auto max-w-md text-center text-sm leading-relaxed text-stone-500">
+                Try <span className="text-stone-400">How do I ask for the check?</span> or{" "}
+                <span className="text-stone-400">
+                  What does donde esta el bano mean?
+                </span>
+              </p>
+            ) : null}
+            {messages.map((message) => (
+              <p
+                key={message.id}
+                className={`max-w-[min(100%,34rem)] whitespace-pre-wrap text-pretty rounded-2xl px-4 py-3 text-left text-base leading-relaxed sm:px-5 ${
+                  message.role === "user"
+                    ? "ml-auto border border-orange-400/35 bg-orange-400/15 font-medium text-stone-100"
+                    : "border border-stone-600/80 bg-stone-800/70 text-stone-200"
+                }`}
+              >
+                {message.content}
+              </p>
+            ))}
+            {isAwaitingAnswer ? <TypingIndicator /> : null}
+            <div ref={logEndRef} className="h-0 shrink-0" aria-hidden />
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <textarea
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  void askQuestion();
+                }
+              }}
+              disabled={isAwaitingAnswer}
+              rows={3}
+              className="min-h-24 min-w-0 flex-1 resize-none rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:cursor-not-allowed disabled:opacity-45"
+              placeholder="Ask in English or Spanish..."
+              aria-label="Question"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                void askQuestion();
+              }}
+              disabled={isAwaitingAnswer || !question.trim()}
+              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-8"
+            >
+              <FontAwesomeIcon icon={faPaperPlane} className="text-sm" />
+              Ask
+            </button>
+          </div>
+          {status && !isAwaitingAnswer ? (
+            <p className="text-sm text-stone-400" role="status">
+              {status}
+            </p>
+          ) : null}
+        </main>
+      </div>
+    </div>
+  );
+}

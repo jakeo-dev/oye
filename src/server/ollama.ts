@@ -376,6 +376,39 @@ export async function generateConversationReply(
   return data.response?.trim() || "Muy bien. Try saying it one more time.";
 }
 
+export async function generateTravelAnswer(
+  question: string,
+  options: OllamaOptions = {},
+): Promise<string> {
+  const { baseUrl, model } = getOllamaConfig(options);
+  const prompt = [
+    "You are an offline Spanish travel language assistant for an English-speaking traveler.",
+    "The user may ask in English or Spanish.",
+    "Answer practical questions about how to say something in Spanish, what Spanish text means in English, pronunciation, grammar, vocabulary, and travel situations.",
+    "If the user asks for a translation, give the most natural travel phrase first, then a literal meaning if useful.",
+    "If the user asks what something means, translate it and explain any important tone or usage.",
+    "Keep answers concise, practical, and beginner-friendly.",
+    "Do not claim access to live information, maps, prices, schedules, laws, or current events. If the answer depends on current local facts, say that you cannot verify that offline and give language help instead.",
+    `Question: ${question}`,
+  ].join("\n");
+
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, prompt, stream: false }),
+  });
+
+  if (!response.ok) {
+    throw await createOllamaError(response);
+  }
+
+  const data = (await response.json()) as OllamaGenerateResponse;
+  return (
+    data.response?.trim() ||
+    "I could not generate an answer. Try asking in a shorter sentence."
+  );
+}
+
 export function generateFallbackLesson(input: LessonGenerationInput): Lesson {
   return createFallbackLesson(input);
 }
