@@ -49,6 +49,7 @@ export default async function handler(
           scenarioPresetId: generationInput.scenarioPresetId,
           curriculumSectionId,
           level: generationInput.level ?? "beginner",
+          aiResponseFlavor: settings.aiResponseFlavor,
         });
         if (cachedLesson) {
           await saveLesson(cachedLesson);
@@ -62,6 +63,7 @@ export default async function handler(
         : await generateLessonWithOllama(generationInput, {
             baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
             model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
+            aiResponseFlavor: settings.aiResponseFlavor,
           });
 
       if (generationInput.scenarioPresetId) {
@@ -69,6 +71,7 @@ export default async function handler(
           scenarioPresetId: generationInput.scenarioPresetId,
           curriculumSectionId,
           level: lesson.level,
+          aiResponseFlavor: settings.aiResponseFlavor,
           lesson,
         });
       }

@@ -8,11 +8,17 @@ import {
   faVolumeHigh,
   faBell,
   faBullseye,
+  faPalette,
 } from "@fortawesome/free-solid-svg-icons";
 import { Host_Grotesk } from "next/font/google";
 
 import Image from "next/image";
 
+import {
+  AI_RESPONSE_FLAVORS,
+  DEFAULT_AI_RESPONSE_FLAVOR,
+} from "@/lib/aiFlavors";
+import type { AiResponseFlavor } from "@/lib/aiFlavors";
 import { useSoundEffect } from "@/hooks/useSoundEffect";
 
 const hostGrotesk = Host_Grotesk({
@@ -32,6 +38,7 @@ type OllamaSettings = {
     reminderTime: string;
     ollamaBaseUrl: string | null;
     ollamaModel: string | null;
+    aiResponseFlavor: AiResponseFlavor;
   };
   env: Record<string, string>;
 };
@@ -105,6 +112,9 @@ export default function Settings() {
   const [reminderTime, setReminderTime] = useState("18:00");
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState("");
   const [ollamaModel, setOllamaModel] = useState("");
+  const [aiResponseFlavor, setAiResponseFlavor] = useState<AiResponseFlavor>(
+    DEFAULT_AI_RESPONSE_FLAVOR,
+  );
   const [toast, setToast] = useState<string | null>(null);
   const playSound = useSoundEffect();
 
@@ -116,6 +126,9 @@ export default function Settings() {
     setReminderTime(data.settings.reminderTime);
     setOllamaBaseUrl(data.settings.ollamaBaseUrl ?? data.ollama.baseUrl);
     setOllamaModel(data.settings.ollamaModel ?? data.ollama.model);
+    setAiResponseFlavor(
+      data.settings.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
+    );
   }, []);
 
   const loadSettings = useCallback(async () => {
@@ -262,6 +275,20 @@ export default function Settings() {
     }
   }
 
+  async function persistAiResponseFlavor(value: AiResponseFlavor) {
+    setAiResponseFlavor(value);
+    try {
+      await patchSettings({ aiResponseFlavor: value });
+      const label =
+        AI_RESPONSE_FLAVORS.find((flavor) => flavor.id === value)?.label ??
+        "AI flavor";
+      showToast(`AI flavor set to ${label}.`);
+      playSound("tap");
+    } catch {
+      showToast("Could not save AI flavor.");
+    }
+  }
+
   async function testMacReminder() {
     try {
       const response = await fetch("/api/reminder", { method: "POST" });
@@ -293,6 +320,7 @@ export default function Settings() {
         reminderTime: "18:00",
         ollamaBaseUrl: null,
         ollamaModel: null,
+        aiResponseFlavor: DEFAULT_AI_RESPONSE_FLAVOR,
       });
       showToast("Preferences cleared.");
     } catch {
@@ -428,6 +456,65 @@ export default function Settings() {
               >
                 Test Mac notification
               </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 gap-3 text-left">
+                <span
+                  className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400"
+                  aria-hidden
+                >
+                  <FontAwesomeIcon icon={faPalette} className="text-lg" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black tracking-tight text-white">
+                    AI response style
+                  </h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-relaxed text-stone-400">
+                    Choose the flavor used for Ask answers and newly generated
+                    lessons.
+                  </p>
+                </div>
+              </div>
+              <label className="sr-only" htmlFor="ai-response-flavor">
+                AI response style
+              </label>
+              <select
+                id="ai-response-flavor"
+                value={aiResponseFlavor}
+                onChange={(e) =>
+                  void persistAiResponseFlavor(e.target.value as AiResponseFlavor)
+                }
+                disabled={!mounted}
+                className="h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50 sm:w-64"
+              >
+                {AI_RESPONSE_FLAVORS.map((flavor) => (
+                  <option key={flavor.id} value={flavor.id}>
+                    {flavor.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {AI_RESPONSE_FLAVORS.map((flavor) => (
+                <div
+                  key={flavor.id}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    aiResponseFlavor === flavor.id
+                      ? "border-orange-400/45 bg-orange-400/10"
+                      : "border-stone-700/60 bg-stone-950/35"
+                  }`}
+                >
+                  <p className="text-sm font-bold text-stone-100">
+                    {flavor.label}
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-stone-400">
+                    {flavor.description}
+                  </p>
+                </div>
+              ))}
             </div>
           </section>
 

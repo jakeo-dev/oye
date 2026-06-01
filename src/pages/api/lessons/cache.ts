@@ -54,6 +54,7 @@ export default async function handler(
         scenarioPresetId,
         curriculumSectionId: currentCurriculumSection.id,
         level,
+        aiResponseFlavor: settings.aiResponseFlavor,
       });
       if (existing) {
         cached.push(scenarioPresetId);
@@ -69,11 +70,13 @@ export default async function handler(
       const lesson = await generateLessonWithOllama(input, {
         baseUrl: settings.ollamaBaseUrl ?? undefined,
         model: settings.ollamaModel ?? undefined,
+        aiResponseFlavor: settings.aiResponseFlavor,
       });
       await saveCachedLesson({
         scenarioPresetId,
         curriculumSectionId: currentCurriculumSection.id,
         level: lesson.level,
+        aiResponseFlavor: settings.aiResponseFlavor,
         lesson,
       });
       warmed.push(scenarioPresetId);

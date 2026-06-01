@@ -1,3 +1,5 @@
+import type { AiResponseFlavor } from "@/lib/aiFlavors";
+
 export type LessonLevel = "beginner" | "upper-beginner";
 
 export type VocabularyItem = {
@@ -119,6 +121,7 @@ export type AppSettings = {
   reminderTime: string;
   ollamaBaseUrl: string | null;
   ollamaModel: string | null;
+  aiResponseFlavor: AiResponseFlavor;
 };
 
 export type AppDatabase = {

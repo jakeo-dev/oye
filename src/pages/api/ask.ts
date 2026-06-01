@@ -30,6 +30,7 @@ export default async function handler(
     const answer = await generateTravelAnswer(question, {
       baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
       model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
+      aiResponseFlavor: settings.aiResponseFlavor,
     });
 
     res.status(200).json({ answer });

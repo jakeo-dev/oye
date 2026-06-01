@@ -21,6 +21,11 @@ import {
   getNextCurriculumSection,
 } from "@/lib/curriculum";
 import type { CurriculumSection } from "@/lib/curriculum";
+import {
+  DEFAULT_AI_RESPONSE_FLAVOR,
+  normalizeAiResponseFlavor,
+} from "@/lib/aiFlavors";
+import type { AiResponseFlavor } from "@/lib/aiFlavors";
 
 const databasePath =
   process.env.APP_DATABASE_PATH ?? path.join("data", "app-db.json");
@@ -45,6 +50,7 @@ function defaultSettings(): AppSettings {
     reminderTime: "18:00",
     ollamaBaseUrl: null,
     ollamaModel: null,
+    aiResponseFlavor: DEFAULT_AI_RESPONSE_FLAVOR,
   };
 }
 
@@ -95,28 +101,35 @@ export function getLessonCacheKey({
   scenarioPresetId,
   curriculumSectionId,
   level,
+  aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: string;
+  aiResponseFlavor?: AiResponseFlavor;
 }): string {
-  return [scenarioPresetId, curriculumSectionId, level].join("::");
+  return [scenarioPresetId, curriculumSectionId, level, aiResponseFlavor].join(
+    "::",
+  );
 }
 
 export async function getCachedLesson({
   scenarioPresetId,
   curriculumSectionId,
   level,
+  aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: string;
+  aiResponseFlavor?: AiResponseFlavor;
 }): Promise<Lesson | null> {
   const database = await readDatabase();
   const cacheKey = getLessonCacheKey({
     scenarioPresetId,
     curriculumSectionId,
     level,
+    aiResponseFlavor,
   });
   return database.lessonCache.find((item) => item.cacheKey === cacheKey)?.lesson ?? null;
 }
@@ -125,11 +138,13 @@ export async function saveCachedLesson({
   scenarioPresetId,
   curriculumSectionId,
   level,
+  aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
   lesson,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: Lesson["level"];
+  aiResponseFlavor?: AiResponseFlavor;
   lesson: Lesson;
 }): Promise<CachedLesson> {
   const database = await readDatabase();
@@ -137,6 +152,7 @@ export async function saveCachedLesson({
     scenarioPresetId,
     curriculumSectionId,
     level,
+    aiResponseFlavor,
   });
   const existing = database.lessonCache.find((item) => item.cacheKey === cacheKey);
   const cachedLesson: CachedLesson = {
@@ -512,6 +528,9 @@ function normalizeSettings(changes: Partial<AppSettings>): Partial<AppSettings> 
   }
   if (changes.ollamaModel === null || typeof changes.ollamaModel === "string") {
     next.ollamaModel = changes.ollamaModel?.trim() || null;
+  }
+  if (changes.aiResponseFlavor) {
+    next.aiResponseFlavor = normalizeAiResponseFlavor(changes.aiResponseFlavor);
   }
   return next;
 }

@@ -1,6 +1,11 @@
 import { buildLessonStepsFromCore } from "@/lib/lessonSteps";
 import { getCurriculumSection } from "@/lib/curriculum";
 import type { CurriculumSection } from "@/lib/curriculum";
+import {
+  DEFAULT_AI_RESPONSE_FLAVOR,
+  getAiFlavorInstruction,
+} from "@/lib/aiFlavors";
+import type { AiResponseFlavor } from "@/lib/aiFlavors";
 
 import type {
   AppSettings,
@@ -17,6 +22,7 @@ type OllamaOptions = {
   baseUrl?: string;
   model?: string;
   practiceFocus?: PracticeMistake[];
+  aiResponseFlavor?: AiResponseFlavor;
 };
 
 type OllamaGenerateResponse = {
@@ -208,10 +214,12 @@ function buildLessonPrompt({
   curriculumSection,
   level,
   scenario,
+  aiResponseFlavor,
 }: {
   curriculumSection: CurriculumSection | null;
   level: LessonLevel;
   scenario: string;
+  aiResponseFlavor: AiResponseFlavor;
 }): string {
   const curriculumLines = curriculumSection
     ? [
@@ -236,6 +244,7 @@ function buildLessonPrompt({
     '{"title":"string","scenario":"string","touristFocus":"string","spanishPrompt":"string","englishTranslation":"string","vocabulary":[{"spanish":"string","english":"string"}],"practiceQuestions":["string"],"steps":[{"kind":"overview|vocabulary|grammar|phrase|practice","title":"string","body":"string","words":[{"spanish":"string","english":"string"}],"spanish":"string","english":"string"}]}',
     "Rules for steps: use kind overview first (set expectations), then vocabulary (include words array), grammar (explain the curriculum section clearly; spanish/english optional), phrase (key line in spanish + english), practice last (body with 2-4 prompts, no need for spanish field).",
     "Omit optional fields when empty.",
+    `AI response flavor: ${getAiFlavorInstruction(aiResponseFlavor)}`,
     `Level: ${level}`,
     `Scenario: ${scenario}`,
     "Keep Spanish natural, practical, and beginner friendly.",
@@ -250,7 +259,12 @@ export async function generateLessonWithOllama(
   const level = normalizeLevel(input.level);
   const scenario = input.scenario ?? input.topic ?? "tourist basics in Alicante";
   const curriculumSection = getCurriculumSection(input.curriculumSectionId);
-  const prompt = buildLessonPrompt({ curriculumSection, level, scenario });
+  const prompt = buildLessonPrompt({
+    curriculumSection,
+    level,
+    scenario,
+    aiResponseFlavor: options.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
+  });
 
   const response = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
@@ -388,6 +402,9 @@ export async function generateTravelAnswer(
     "If the user asks for a translation, give the most natural travel phrase first, then a literal meaning if useful.",
     "If the user asks what something means, translate it and explain any important tone or usage.",
     "Keep answers concise, practical, and beginner-friendly.",
+    `AI response flavor: ${getAiFlavorInstruction(
+      options.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
+    )}`,
     "Do not claim access to live information, maps, prices, schedules, laws, or current events. If the answer depends on current local facts, say that you cannot verify that offline and give language help instead.",
     `Question: ${question}`,
   ].join("\n");
