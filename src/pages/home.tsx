@@ -2,11 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faArrowRight,
-  faBookOpen,
-  faComments,
-} from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faBookOpen } from "@fortawesome/free-solid-svg-icons";
 
 import { Host_Grotesk } from "next/font/google";
 const hostGrotesk = Host_Grotesk({
@@ -83,8 +79,7 @@ export default function Home() {
               Pick up where you left off
             </h1>
             <p className="max-w-md text-right text-base leading-relaxed text-pretty text-stone-400 sm:text-lg">
-              Structured lessons or open conversation practice — use whichever
-              fits your mood today.
+              Continue with structured lessons built around practical Spanish.
             </p>
           </header>
 
@@ -97,12 +92,6 @@ export default function Home() {
               title="Lessons"
               description="Guided phrases, grammar, and scenarios you can study at your own pace."
               icon={faBookOpen}
-            />
-            <NavCard
-              href="/conversation"
-              title="Conversation"
-              description="Talk with the AI coach and practice responding in real time."
-              icon={faComments}
             />
           </nav>
         </div>
