@@ -21,8 +21,25 @@ type OllamaGenerateResponse = {
   response?: string;
 };
 
+type OllamaTagsResponse = {
+  models?: Array<{
+    name?: unknown;
+    model?: unknown;
+  }>;
+};
+
 type OllamaErrorResponse = {
   error?: unknown;
+};
+
+export type OllamaStatus = "online" | "missing-model" | "offline";
+
+export type OllamaStatusResult = {
+  status: OllamaStatus;
+  label: string;
+  detail: string;
+  baseUrl: string;
+  model: string;
 };
 
 const defaultBaseUrl = "http://127.0.0.1:11434";
@@ -155,8 +172,93 @@ async function createOllamaError(response: Response): Promise<Error> {
   return new Error(`Ollama request failed with ${response.status}${detail}.`);
 }
 
+function modelNameMatches(
+  availableModel: string,
+  configuredModel: string,
+): boolean {
+  return (
+    availableModel === configuredModel ||
+    availableModel === `${configuredModel}:latest` ||
+    availableModel.startsWith(`${configuredModel}:`)
+  );
+}
+
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function checkOllamaStatus(
+  options: OllamaOptions | AppSettings = {},
+): Promise<OllamaStatusResult> {
+  const { baseUrl, model } = getOllamaConfig(options);
+
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/tags`, 2500);
+    if (!response.ok) {
+      return {
+        status: "offline",
+        label: "Ollama offline",
+        detail: `Ollama responded with ${response.status}.`,
+        baseUrl,
+        model,
+      };
+    }
+
+    const data = (await response.json()) as OllamaTagsResponse;
+    const modelNames =
+      data.models
+        ?.map((item) =>
+          typeof item.name === "string"
+            ? item.name
+            : typeof item.model === "string"
+              ? item.model
+              : "",
+        )
+        .filter(Boolean) ?? [];
+    const hasConfiguredModel = modelNames.some((name) =>
+      modelNameMatches(name, model),
+    );
+
+    if (!hasConfiguredModel) {
+      return {
+        status: "missing-model",
+        label: "Model missing",
+        detail: `${model} is not installed in Ollama.`,
+        baseUrl,
+        model,
+      };
+    }
+
+    return {
+      status: "online",
+      label: "Ollama ready",
+      detail: `${model} is available.`,
+      baseUrl,
+      model,
+    };
+  } catch {
+    return {
+      status: "offline",
+      label: "Ollama offline",
+      detail: `Could not reach ${baseUrl}.`,
+      baseUrl,
+      model,
+    };
+  }
+}
+
 function createFallbackLesson(input: LessonGenerationInput): Lesson {
-  const scenario = input.scenario ?? input.topic ?? "ordering coffee in Alicante";
+  const scenario =
+    input.scenario ?? input.topic ?? "ordering coffee in Alicante";
   const curriculumSection = getCurriculumSection(input.curriculumSectionId);
   const core = {
     title: curriculumSection
@@ -246,7 +348,8 @@ export async function generateLessonWithOllama(
 ): Promise<Lesson> {
   const { baseUrl, model } = getOllamaConfig(options);
   const level = normalizeLevel(input.level);
-  const scenario = input.scenario ?? input.topic ?? "tourist basics in Alicante";
+  const scenario =
+    input.scenario ?? input.topic ?? "tourist basics in Alicante";
   const curriculumSection = getCurriculumSection(input.curriculumSectionId);
   const prompt = buildLessonPrompt({ curriculumSection, level, scenario });
 
@@ -269,7 +372,9 @@ export async function generateLessonWithOllama(
   const generated = parseJsonObject(data.response ?? "");
   const vocabulary = parseVocabularyArray(generated.vocabulary);
   const title = String(generated.title ?? "Spanish Tourist Lesson");
-  const touristFocus = String(generated.touristFocus ?? "Tourist Spanish basics.");
+  const touristFocus = String(
+    generated.touristFocus ?? "Tourist Spanish basics.",
+  );
   const spanishPrompt = String(generated.spanishPrompt ?? "");
   const englishTranslation = String(generated.englishTranslation ?? "");
   const practiceQuestions = asStringArray(generated.practiceQuestions);
@@ -341,7 +446,9 @@ export async function generateConversationReply(
     curriculumSection
       ? `Keep your correction aligned with this grammar focus: ${curriculumSection.focus}`
       : "",
-    lesson ? `Lesson scenario: ${lesson.scenario}` : "Scenario: tourist Spanish practice.",
+    lesson
+      ? `Lesson scenario: ${lesson.scenario}`
+      : "Scenario: tourist Spanish practice.",
     lesson ? `Current lesson phrase: ${lesson.spanishPrompt}` : "",
     `Student said: ${userText}`,
   ].join("\n");
