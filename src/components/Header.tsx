@@ -95,6 +95,29 @@ function ExternalIconButton({
   );
 }
 
+function OllamaStatusBadge({
+  status,
+}: {
+  status: Required<Pick<OllamaStatusResponse, "status" | "label" | "detail">>;
+}) {
+  const statusStyles = ollamaStatusStyles[status.status];
+
+  return (
+    <span
+      className={`inline-flex max-w-36 items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-[0.6875rem] leading-none font-bold sm:max-w-44 ${statusStyles.bubble}`}
+      role="status"
+      aria-live="polite"
+      title={status.detail}
+    >
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${statusStyles.dot}`}
+        aria-hidden
+      />
+      <span className="truncate">{status.label}</span>
+    </span>
+  );
+}
+
 export default function Header({ showProgressBar = false }: AppHeaderProps) {
   const router = useRouter();
   const [progressFraction, setProgressFraction] = useState(0);
@@ -201,7 +224,6 @@ export default function Header({ showProgressBar = false }: AppHeaderProps) {
   const githubHref =
     process.env.NEXT_PUBLIC_GITHUB_URL?.trim() ||
     "https://github.com/jakeo-dev/oye";
-  const statusStyles = ollamaStatusStyles[ollamaStatus.status];
 
   return (
     <header
@@ -232,24 +254,12 @@ export default function Header({ showProgressBar = false }: AppHeaderProps) {
                 aria-label={progressLabel}
               />
             </div>
-            <div className="flex justify-center">
-              <span
-                className={`inline-flex max-w-full items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-[0.6875rem] leading-none font-bold ${statusStyles.bubble}`}
-                role="status"
-                aria-live="polite"
-                title={ollamaStatus.detail}
-              >
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${statusStyles.dot}`}
-                  aria-hidden
-                />
-                <span className="truncate">{ollamaStatus.label}</span>
-              </span>
-            </div>
           </div>
         )}
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <OllamaStatusBadge status={ollamaStatus} />
+
           {router.pathname === "/home" && (
             <ExternalIconButton href={githubHref} label="Project on GitHub">
               <FontAwesomeIcon
