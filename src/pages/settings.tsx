@@ -2,8 +2,10 @@ import { useCallback, useEffect, useId, useState } from "react";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faArrowsRotate,
   faDatabase,
   faFloppyDisk,
+  faSliders,
   faTrashCan,
   faVolumeHigh,
   faBell,
@@ -20,6 +22,15 @@ import {
   DEFAULT_AI_RESPONSE_FLAVOR,
 } from "@/lib/aiFlavors";
 import type { AiResponseFlavor } from "@/lib/aiFlavors";
+import {
+  DEFAULT_OLLAMA_GENERATION_OPTIONS,
+  OLLAMA_GENERATION_OPTION_FIELDS,
+  normalizeOllamaGenerationOptions,
+} from "@/lib/ollamaGenerationOptions";
+import type {
+  OllamaGenerationOptionId,
+  OllamaGenerationOptions,
+} from "@/lib/ollamaGenerationOptions";
 import { useSoundEffect } from "@/hooks/useSoundEffect";
 
 const hostGrotesk = Host_Grotesk({
@@ -31,6 +42,7 @@ type OllamaSettings = {
   ollama: {
     baseUrl: string;
     model: string;
+    ollamaOptions: OllamaGenerationOptions;
   };
   settings: {
     soundEnabled: boolean;
@@ -39,10 +51,24 @@ type OllamaSettings = {
     reminderTime: string;
     ollamaBaseUrl: string | null;
     ollamaModel: string | null;
+    ollamaOptions: OllamaGenerationOptions;
     aiResponseFlavor: AiResponseFlavor;
     customAiInstructions: string;
   };
   env: Record<string, string>;
+};
+
+type OllamaModelOption = {
+  name: string;
+  model: string;
+  family: string | null;
+  parameterSize: string | null;
+  quantizationLevel: string | null;
+};
+
+type OllamaModelsResponse = {
+  models?: OllamaModelOption[];
+  error?: string;
 };
 
 function SettingSwitch({
@@ -105,6 +131,17 @@ function SettingSwitch({
   );
 }
 
+function formatModelLabel(model: OllamaModelOption) {
+  const details = [model.parameterSize, model.quantizationLevel, model.family]
+    .filter(Boolean)
+    .join(" · ");
+  return details ? `${model.name} (${details})` : model.name;
+}
+
+function formatOptionValue(value: number, valueType: "float" | "int") {
+  return valueType === "int" ? String(Math.round(value)) : value.toFixed(2);
+}
+
 export default function Settings() {
   const [settings, setSettings] = useState<OllamaSettings | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -114,6 +151,12 @@ export default function Settings() {
   const [reminderTime, setReminderTime] = useState("18:00");
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState("");
   const [ollamaModel, setOllamaModel] = useState("");
+  const [ollamaOptions, setOllamaOptions] = useState<OllamaGenerationOptions>(
+    DEFAULT_OLLAMA_GENERATION_OPTIONS,
+  );
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelOption[]>([]);
+  const [isLoadingOllamaModels, setIsLoadingOllamaModels] = useState(false);
+  const [ollamaModelsError, setOllamaModelsError] = useState("");
   const [aiResponseFlavor, setAiResponseFlavor] = useState<AiResponseFlavor>(
     DEFAULT_AI_RESPONSE_FLAVOR,
   );
@@ -131,6 +174,9 @@ export default function Settings() {
     setReminderTime(data.settings.reminderTime);
     setOllamaBaseUrl(data.settings.ollamaBaseUrl ?? data.ollama.baseUrl);
     setOllamaModel(data.settings.ollamaModel ?? data.ollama.model);
+    setOllamaOptions(
+      normalizeOllamaGenerationOptions(data.settings.ollamaOptions),
+    );
     setAiResponseFlavor(
       data.settings.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
     );
@@ -139,17 +185,48 @@ export default function Settings() {
     );
   }, []);
 
+  const loadOllamaModels = useCallback(async (baseUrl: string) => {
+    setIsLoadingOllamaModels(true);
+    setOllamaModelsError("");
+    try {
+      const params = new URLSearchParams();
+      if (baseUrl.trim()) {
+        params.set("baseUrl", baseUrl.trim());
+      }
+      const query = params.toString();
+      const response = await fetch(
+        `/api/settings/ollama/models${query ? `?${query}` : ""}`,
+      );
+      const data = (await response.json()) as OllamaModelsResponse;
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not load Ollama models.");
+      }
+      setOllamaModels(data.models ?? []);
+      setOllamaModelsError("");
+    } catch (error) {
+      setOllamaModels([]);
+      setOllamaModelsError(
+        error instanceof Error
+          ? error.message
+          : "Could not load Ollama models.",
+      );
+    } finally {
+      setIsLoadingOllamaModels(false);
+    }
+  }, []);
+
   const loadSettings = useCallback(async () => {
     try {
       const response = await fetch("/api/settings/ollama");
       const data = (await response.json()) as OllamaSettings;
       applySettings(data);
+      void loadOllamaModels(data.settings.ollamaBaseUrl ?? data.ollama.baseUrl);
       setMounted(true);
     } catch {
       setSettings(null);
       setMounted(true);
     }
-  }, [applySettings]);
+  }, [applySettings, loadOllamaModels]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -185,6 +262,7 @@ export default function Settings() {
         body: JSON.stringify({
           baseUrl: ollamaBaseUrl,
           model: ollamaModel,
+          ollamaOptions,
         }),
       });
       const data = (await response.json()) as OllamaSettings;
@@ -193,6 +271,7 @@ export default function Settings() {
       }
       applySettings(data);
       window.dispatchEvent(new Event("oye:settings-updated"));
+      void loadOllamaModels(data.settings.ollamaBaseUrl ?? data.ollama.baseUrl);
       showToast("Ollama settings saved.");
       playSound("success");
     } catch {
@@ -210,6 +289,7 @@ export default function Settings() {
           level: "beginner",
           ollamaBaseUrl,
           ollamaModel,
+          ollamaOptions,
         }),
       });
       if (!response.ok) {
@@ -342,6 +422,7 @@ export default function Settings() {
         reminderTime: "18:00",
         ollamaBaseUrl: null,
         ollamaModel: null,
+        ollamaOptions: DEFAULT_OLLAMA_GENERATION_OPTIONS,
         aiResponseFlavor: DEFAULT_AI_RESPONSE_FLAVOR,
         customAiInstructions: DEFAULT_CUSTOM_AI_INSTRUCTIONS,
       });
@@ -349,6 +430,23 @@ export default function Settings() {
     } catch {
       showToast("Could not clear preferences.");
     }
+  }
+
+  function updateOllamaOption(
+    id: OllamaGenerationOptionId,
+    rawValue: string,
+  ) {
+    setOllamaOptions((current) =>
+      normalizeOllamaGenerationOptions({
+        ...current,
+        [id]: rawValue,
+      }),
+    );
+  }
+
+  function resetOllamaOptions() {
+    setOllamaOptions(DEFAULT_OLLAMA_GENERATION_OPTIONS);
+    showToast("Model parameters reset to defaults.");
   }
 
   return (
@@ -364,7 +462,7 @@ export default function Settings() {
         aria-hidden
       />
 
-      <div className="relative mx-auto w-full max-w-220 px-8 py-12">
+      <div className="relative mx-auto w-full max-w-300 px-8 py-12">
         <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg ring-1 shadow-black/25 ring-white/5 backdrop-blur-sm sm:p-7">
           <div
             className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
@@ -616,7 +714,7 @@ export default function Settings() {
 
           <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
             <div className="flex flex-col gap-8 md:flex-row md:gap-12">
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-3">
                   <span
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400"
@@ -632,41 +730,188 @@ export default function Settings() {
                   Save model settings without restarting Next.js. Environment
                   variables remain the fallback when these fields are blank.
                 </p>
-                <div className="mt-4 space-y-4 rounded-xl border border-stone-700/60 bg-stone-950/50 p-4 text-sm">
-                  <div>
-                    <label
-                      className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
-                      htmlFor="ollama-base-url"
-                    >
-                      Base URL
-                    </label>
-                    <input
-                      id="ollama-base-url"
-                      value={ollamaBaseUrl}
-                      onChange={(e) => setOllamaBaseUrl(e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
-                      placeholder={
-                        settings?.env.OLLAMA_BASE_URL ??
-                        "http://127.0.0.1:11434"
-                      }
-                    />
+                <div className="mt-4 space-y-5 rounded-xl border border-stone-700/60 bg-stone-950/50 p-4 text-sm">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label
+                        className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
+                        htmlFor="ollama-base-url"
+                      >
+                        Base URL
+                      </label>
+                      <input
+                        id="ollama-base-url"
+                        value={ollamaBaseUrl}
+                        onChange={(e) => setOllamaBaseUrl(e.target.value)}
+                        className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                        placeholder={
+                          settings?.env.OLLAMA_BASE_URL ??
+                          "http://127.0.0.1:11434"
+                        }
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <label
+                          className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
+                          htmlFor="ollama-model"
+                        >
+                          Model
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void loadOllamaModels(ollamaBaseUrl)}
+                          disabled={isLoadingOllamaModels}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-stone-600 px-3 py-1 text-xs font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <FontAwesomeIcon
+                            icon={faArrowsRotate}
+                            className={`text-xs ${
+                              isLoadingOllamaModels ? "animate-spin" : ""
+                            }`}
+                          />
+                          Refresh
+                        </button>
+                      </div>
+                      {ollamaModels.length > 0 ? (
+                        <select
+                          id="ollama-model"
+                          value={ollamaModel}
+                          onChange={(e) => setOllamaModel(e.target.value)}
+                          className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                        >
+                          {ollamaModel &&
+                          !ollamaModels.some(
+                            (model) => model.name === ollamaModel,
+                          ) ? (
+                            <option value={ollamaModel}>
+                              {ollamaModel} (manual)
+                            </option>
+                          ) : null}
+                          {ollamaModels.map((model) => (
+                            <option key={model.model} value={model.name}>
+                              {formatModelLabel(model)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id="ollama-model"
+                          value={ollamaModel}
+                          onChange={(e) => setOllamaModel(e.target.value)}
+                          className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                          placeholder={settings?.env.OLLAMA_MODEL ?? "llama3.2"}
+                        />
+                      )}
+                      <p className="mt-2 text-xs leading-relaxed text-stone-500">
+                        {ollamaModelsError
+                          ? `${ollamaModelsError} You can still type a model name manually.`
+                          : ollamaModels.length > 0
+                            ? `${ollamaModels.length} local model${
+                                ollamaModels.length === 1 ? "" : "s"
+                              } found.`
+                            : "Refresh to load locally installed Ollama models."}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      className="text-xs font-semibold tracking-wide text-stone-400 uppercase"
-                      htmlFor="ollama-model"
-                    >
-                      Model
-                    </label>
-                    <input
-                      id="ollama-model"
-                      value={ollamaModel}
-                      onChange={(e) => setOllamaModel(e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
-                      placeholder={settings?.env.OLLAMA_MODEL ?? "llama3.2"}
-                    />
+
+                  <div className="border-t border-stone-700/80 pt-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-3 text-left">
+                        <span
+                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400"
+                          aria-hidden
+                        >
+                          <FontAwesomeIcon
+                            icon={faSliders}
+                            className="text-base"
+                          />
+                        </span>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-stone-100">
+                            Generation parameters
+                          </h3>
+                          <p className="mt-1 text-sm leading-relaxed text-stone-400">
+                            These values are sent with Ollama generation
+                            requests for new lessons, Ask answers, and
+                            conversation replies.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={resetOllamaOptions}
+                        className="inline-flex shrink-0 items-center justify-center rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-200 transition hover:bg-stone-800"
+                      >
+                        Reset defaults
+                      </button>
+                    </div>
+                    <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                      {OLLAMA_GENERATION_OPTION_FIELDS.map((field) => {
+                        const fieldId = `ollama-option-${field.id}`;
+                        const value = ollamaOptions[field.id];
+                        return (
+                          <div
+                            key={field.id}
+                            className="rounded-xl border border-stone-700/60 bg-stone-900/45 p-4"
+                          >
+                            <div className="flex flex-col items-start gap-3 xl:flex-row xl:justify-between">
+                              <label
+                                className="min-w-0 text-sm leading-snug font-bold text-stone-100"
+                                htmlFor={fieldId}
+                              >
+                                {field.label}
+                              </label>
+                              <input
+                                id={fieldId}
+                                type="number"
+                                value={formatOptionValue(
+                                  value,
+                                  field.valueType,
+                                )}
+                                min={field.min}
+                                max={field.max}
+                                step={field.step}
+                                onChange={(e) =>
+                                  updateOllamaOption(
+                                    field.id,
+                                    e.target.value,
+                                  )
+                                }
+                                className="h-9 w-24 shrink-0 rounded-lg border border-stone-600/80 bg-stone-950/70 px-3 text-right font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                                aria-describedby={`${fieldId}-desc`}
+                              />
+                            </div>
+                            {field.control === "slider" ? (
+                              <input
+                                type="range"
+                                value={value}
+                                min={field.min}
+                                max={field.max}
+                                step={field.step}
+                                onChange={(e) =>
+                                  updateOllamaOption(
+                                    field.id,
+                                    e.target.value,
+                                  )
+                                }
+                                className="mt-3 h-2 w-full accent-orange-400"
+                                aria-label={`${field.label} slider`}
+                              />
+                            ) : null}
+                            <p
+                              className="mt-3 text-xs leading-relaxed text-stone-500"
+                              id={`${fieldId}-desc`}
+                            >
+                              {field.description}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-3 pt-1">
+
+                  <div className="flex flex-wrap gap-3 border-t border-stone-700/80 pt-5">
                     <button
                       type="button"
                       onClick={() => void saveOllamaSettings()}

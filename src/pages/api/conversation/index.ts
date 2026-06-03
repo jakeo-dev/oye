@@ -11,6 +11,7 @@ import {
 } from "@/server/database";
 import { generateConversationReply } from "@/server/ollama";
 import type { ConversationMessage } from "@/server/types";
+import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
 function newMessage(
   role: ConversationMessage["role"],
@@ -52,6 +53,7 @@ export default async function handler(
       userText?: string;
       ollamaBaseUrl?: string;
       ollamaModel?: string;
+      ollamaOptions?: Partial<OllamaGenerationOptions>;
     };
     const userText = body.userText?.trim();
 
@@ -68,7 +70,10 @@ export default async function handler(
       const reply = await generateConversationReply(userText, lesson, {
         baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
         model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
+        ollamaOptions: body.ollamaOptions ?? settings.ollamaOptions,
         practiceFocus,
+        aiResponseFlavor: settings.aiResponseFlavor,
+        customAiInstructions: settings.customAiInstructions,
       });
       const messages = await saveConversationMessages([
         newMessage("user", userText, body.lessonId ?? null),

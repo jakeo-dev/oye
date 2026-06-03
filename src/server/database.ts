@@ -28,6 +28,11 @@ import {
   normalizeAiResponseFlavor,
 } from "@/lib/aiFlavors";
 import type { AiResponseFlavor } from "@/lib/aiFlavors";
+import {
+  DEFAULT_OLLAMA_GENERATION_OPTIONS,
+  normalizeOllamaGenerationOptions,
+} from "@/lib/ollamaGenerationOptions";
+import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
 const databasePath =
   process.env.APP_DATABASE_PATH ?? path.join("data", "app-db.json");
@@ -52,6 +57,7 @@ function defaultSettings(): AppSettings {
     reminderTime: "18:00",
     ollamaBaseUrl: null,
     ollamaModel: null,
+    ollamaOptions: DEFAULT_OLLAMA_GENERATION_OPTIONS,
     aiResponseFlavor: DEFAULT_AI_RESPONSE_FLAVOR,
     customAiInstructions: DEFAULT_CUSTOM_AI_INSTRUCTIONS,
   };
@@ -64,7 +70,10 @@ async function readDatabase(): Promise<AppDatabase> {
     return {
       ...emptyDatabase(),
       ...parsed,
-      settings: { ...defaultSettings(), ...parsed.settings },
+      settings: {
+        ...defaultSettings(),
+        ...normalizeSettings(parsed.settings ?? {}, defaultSettings()),
+      },
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -106,12 +115,18 @@ export function getLessonCacheKey({
   level,
   aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
   customAiInstructions = DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+  ollamaBaseUrl = "",
+  ollamaModel = "",
+  ollamaOptions = DEFAULT_OLLAMA_GENERATION_OPTIONS,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: string;
   aiResponseFlavor?: AiResponseFlavor;
   customAiInstructions?: string;
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  ollamaOptions?: OllamaGenerationOptions;
 }): string {
   return JSON.stringify([
     scenarioPresetId,
@@ -119,6 +134,9 @@ export function getLessonCacheKey({
     level,
     aiResponseFlavor,
     normalizeCustomAiInstructions(customAiInstructions),
+    ollamaBaseUrl,
+    ollamaModel,
+    normalizeOllamaGenerationOptions(ollamaOptions),
   ]);
 }
 
@@ -128,12 +146,18 @@ export async function getCachedLesson({
   level,
   aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
   customAiInstructions = DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+  ollamaBaseUrl = "",
+  ollamaModel = "",
+  ollamaOptions = DEFAULT_OLLAMA_GENERATION_OPTIONS,
 }: {
   scenarioPresetId: string;
   curriculumSectionId: string;
   level: string;
   aiResponseFlavor?: AiResponseFlavor;
   customAiInstructions?: string;
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  ollamaOptions?: OllamaGenerationOptions;
 }): Promise<Lesson | null> {
   const database = await readDatabase();
   const cacheKey = getLessonCacheKey({
@@ -142,6 +166,9 @@ export async function getCachedLesson({
     level,
     aiResponseFlavor,
     customAiInstructions,
+    ollamaBaseUrl,
+    ollamaModel,
+    ollamaOptions,
   });
   return database.lessonCache.find((item) => item.cacheKey === cacheKey)?.lesson ?? null;
 }
@@ -152,6 +179,9 @@ export async function saveCachedLesson({
   level,
   aiResponseFlavor = DEFAULT_AI_RESPONSE_FLAVOR,
   customAiInstructions = DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+  ollamaBaseUrl = "",
+  ollamaModel = "",
+  ollamaOptions = DEFAULT_OLLAMA_GENERATION_OPTIONS,
   lesson,
 }: {
   scenarioPresetId: string;
@@ -159,6 +189,9 @@ export async function saveCachedLesson({
   level: Lesson["level"];
   aiResponseFlavor?: AiResponseFlavor;
   customAiInstructions?: string;
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  ollamaOptions?: OllamaGenerationOptions;
   lesson: Lesson;
 }): Promise<CachedLesson> {
   const database = await readDatabase();
@@ -168,6 +201,9 @@ export async function saveCachedLesson({
     level,
     aiResponseFlavor,
     customAiInstructions,
+    ollamaBaseUrl,
+    ollamaModel,
+    ollamaOptions,
   });
   const existing = database.lessonCache.find((item) => item.cacheKey === cacheKey);
   const cachedLesson: CachedLesson = {
@@ -444,7 +480,7 @@ export async function updateSettings(
   const database = await readDatabase();
   database.settings = {
     ...database.settings,
-    ...normalizeSettings(changes),
+    ...normalizeSettings(changes, database.settings),
   };
   await writeDatabase(database);
   return database.settings;
@@ -521,7 +557,10 @@ export async function recordActivity(
   return today;
 }
 
-function normalizeSettings(changes: Partial<AppSettings>): Partial<AppSettings> {
+function normalizeSettings(
+  changes: Partial<AppSettings>,
+  current: AppSettings,
+): Partial<AppSettings> {
   const next: Partial<AppSettings> = {};
   if (typeof changes.soundEnabled === "boolean") {
     next.soundEnabled = changes.soundEnabled;
@@ -543,6 +582,12 @@ function normalizeSettings(changes: Partial<AppSettings>): Partial<AppSettings> 
   }
   if (changes.ollamaModel === null || typeof changes.ollamaModel === "string") {
     next.ollamaModel = changes.ollamaModel?.trim() || null;
+  }
+  if (changes.ollamaOptions && typeof changes.ollamaOptions === "object") {
+    next.ollamaOptions = normalizeOllamaGenerationOptions(
+      changes.ollamaOptions,
+      current.ollamaOptions,
+    );
   }
   if (changes.aiResponseFlavor) {
     next.aiResponseFlavor = normalizeAiResponseFlavor(changes.aiResponseFlavor);

@@ -11,8 +11,10 @@ import {
 import {
   generateFallbackLesson,
   generateLessonWithOllama,
+  getOllamaConfig,
 } from "@/server/ollama";
 import type { LessonGenerationInput } from "@/server/types";
+import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
 type ErrorResponse = {
   error: string;
@@ -32,6 +34,7 @@ export default async function handler(
     const body = (req.body ?? {}) as LessonGenerationInput & {
       ollamaBaseUrl?: string;
       ollamaModel?: string;
+      ollamaOptions?: Partial<OllamaGenerationOptions>;
       useFallback?: boolean;
     };
 
@@ -44,6 +47,12 @@ export default async function handler(
         ...body,
         curriculumSectionId,
       };
+      const ollamaConfig = getOllamaConfig({
+        ...settings,
+        ollamaBaseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl,
+        ollamaModel: body.ollamaModel ?? settings.ollamaModel,
+        ollamaOptions: body.ollamaOptions ?? settings.ollamaOptions,
+      });
       if (generationInput.scenarioPresetId) {
         const cachedLesson = await getCachedLesson({
           scenarioPresetId: generationInput.scenarioPresetId,
@@ -51,6 +60,9 @@ export default async function handler(
           level: generationInput.level ?? "beginner",
           aiResponseFlavor: settings.aiResponseFlavor,
           customAiInstructions: settings.customAiInstructions,
+          ollamaBaseUrl: ollamaConfig.baseUrl,
+          ollamaModel: ollamaConfig.model,
+          ollamaOptions: ollamaConfig.ollamaOptions,
         });
         if (cachedLesson) {
           await saveLesson(cachedLesson);
@@ -64,6 +76,7 @@ export default async function handler(
         : await generateLessonWithOllama(generationInput, {
             baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
             model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
+            ollamaOptions: body.ollamaOptions ?? settings.ollamaOptions,
             aiResponseFlavor: settings.aiResponseFlavor,
             customAiInstructions: settings.customAiInstructions,
           });
@@ -75,6 +88,9 @@ export default async function handler(
           level: lesson.level,
           aiResponseFlavor: settings.aiResponseFlavor,
           customAiInstructions: settings.customAiInstructions,
+          ollamaBaseUrl: ollamaConfig.baseUrl,
+          ollamaModel: ollamaConfig.model,
+          ollamaOptions: ollamaConfig.ollamaOptions,
           lesson,
         });
       }

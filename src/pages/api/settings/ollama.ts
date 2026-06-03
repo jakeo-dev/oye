@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 import { getSettings, updateSettings } from "@/server/database";
 import { getOllamaConfig } from "@/server/ollama";
+import { normalizeOllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
+import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,10 +13,14 @@ export default async function handler(
     const body = (req.body ?? {}) as {
       baseUrl?: string;
       model?: string;
+      ollamaOptions?: Partial<OllamaGenerationOptions>;
     };
     const settings = await updateSettings({
       ollamaBaseUrl: body.baseUrl ?? null,
       ollamaModel: body.model ?? null,
+      ollamaOptions: body.ollamaOptions
+        ? normalizeOllamaGenerationOptions(body.ollamaOptions)
+        : undefined,
     });
     const config = getOllamaConfig(settings);
     res.status(200).json({

@@ -1,4 +1,5 @@
 import type { AiResponseFlavor } from "@/lib/aiFlavors";
+import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
 export type LessonLevel = "beginner" | "upper-beginner";
 
@@ -121,6 +122,7 @@ export type AppSettings = {
   reminderTime: string;
   ollamaBaseUrl: string | null;
   ollamaModel: string | null;
+  ollamaOptions: OllamaGenerationOptions;
   aiResponseFlavor: AiResponseFlavor;
   customAiInstructions: string;
 };

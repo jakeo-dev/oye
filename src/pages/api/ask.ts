@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 import { getSettings } from "@/server/database";
 import { generateTravelAnswer } from "@/server/ollama";
+import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
 export default async function handler(
   req: NextApiRequest,
@@ -17,6 +18,7 @@ export default async function handler(
     question?: string;
     ollamaBaseUrl?: string;
     ollamaModel?: string;
+    ollamaOptions?: Partial<OllamaGenerationOptions>;
   };
   const question = body.question?.trim();
 
@@ -30,6 +32,7 @@ export default async function handler(
     const answer = await generateTravelAnswer(question, {
       baseUrl: body.ollamaBaseUrl ?? settings.ollamaBaseUrl ?? undefined,
       model: body.ollamaModel ?? settings.ollamaModel ?? undefined,
+      ollamaOptions: body.ollamaOptions ?? settings.ollamaOptions,
       aiResponseFlavor: settings.aiResponseFlavor,
       customAiInstructions: settings.customAiInstructions,
     });

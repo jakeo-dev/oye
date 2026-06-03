@@ -6,7 +6,7 @@ import {
   getSettings,
   saveCachedLesson,
 } from "@/server/database";
-import { generateLessonWithOllama } from "@/server/ollama";
+import { generateLessonWithOllama, getOllamaConfig } from "@/server/ollama";
 import type { LessonGenerationInput, LessonLevel } from "@/server/types";
 
 type PresetInput = {
@@ -37,6 +37,7 @@ export default async function handler(
   }
 
   const settings = await getSettings();
+  const ollamaConfig = getOllamaConfig(settings);
   const currentCurriculumSection = await getCurrentCurriculumSection();
   const warmed: string[] = [];
   const cached: string[] = [];
@@ -56,6 +57,9 @@ export default async function handler(
         level,
         aiResponseFlavor: settings.aiResponseFlavor,
         customAiInstructions: settings.customAiInstructions,
+        ollamaBaseUrl: ollamaConfig.baseUrl,
+        ollamaModel: ollamaConfig.model,
+        ollamaOptions: ollamaConfig.ollamaOptions,
       });
       if (existing) {
         cached.push(scenarioPresetId);
@@ -71,6 +75,7 @@ export default async function handler(
       const lesson = await generateLessonWithOllama(input, {
         baseUrl: settings.ollamaBaseUrl ?? undefined,
         model: settings.ollamaModel ?? undefined,
+        ollamaOptions: settings.ollamaOptions,
         aiResponseFlavor: settings.aiResponseFlavor,
         customAiInstructions: settings.customAiInstructions,
       });
@@ -80,6 +85,9 @@ export default async function handler(
         level: lesson.level,
         aiResponseFlavor: settings.aiResponseFlavor,
         customAiInstructions: settings.customAiInstructions,
+        ollamaBaseUrl: ollamaConfig.baseUrl,
+        ollamaModel: ollamaConfig.model,
+        ollamaOptions: ollamaConfig.ollamaOptions,
         lesson,
       });
       warmed.push(scenarioPresetId);

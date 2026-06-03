@@ -8,6 +8,11 @@ import {
   getAiFlavorInstruction,
 } from "@/lib/aiFlavors";
 import type { AiResponseFlavor } from "@/lib/aiFlavors";
+import {
+  normalizeOllamaGenerationOptions,
+  toOllamaApiOptions,
+} from "@/lib/ollamaGenerationOptions";
+import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
 import type {
   AppSettings,
@@ -23,6 +28,7 @@ import type {
 type OllamaOptions = {
   baseUrl?: string;
   model?: string;
+  ollamaOptions?: Partial<OllamaGenerationOptions>;
   practiceFocus?: PracticeMistake[];
   aiResponseFlavor?: AiResponseFlavor;
   customAiInstructions?: string;
@@ -36,6 +42,13 @@ type OllamaTagsResponse = {
   models?: Array<{
     name?: unknown;
     model?: unknown;
+    modified_at?: unknown;
+    size?: unknown;
+    details?: {
+      family?: unknown;
+      parameter_size?: unknown;
+      quantization_level?: unknown;
+    };
   }>;
 };
 
@@ -53,11 +66,23 @@ export type OllamaStatusResult = {
   model: string;
 };
 
+export type OllamaModelSummary = {
+  name: string;
+  model: string;
+  modifiedAt: string | null;
+  size: number | null;
+  family: string | null;
+  parameterSize: string | null;
+  quantizationLevel: string | null;
+};
+
 const defaultBaseUrl = "http://127.0.0.1:11434";
 const defaultModel = "llama3.2";
 
 export function getOllamaConfig(options: OllamaOptions | AppSettings = {}) {
   const settings = "ollamaBaseUrl" in options ? options : null;
+  const optionOverrides =
+    "ollamaOptions" in options ? options.ollamaOptions : settings?.ollamaOptions;
   return {
     baseUrl: (
       ("baseUrl" in options ? options.baseUrl : settings?.ollamaBaseUrl) ??
@@ -68,7 +93,12 @@ export function getOllamaConfig(options: OllamaOptions | AppSettings = {}) {
       ("model" in options ? options.model : settings?.ollamaModel) ??
       process.env.OLLAMA_MODEL ??
       defaultModel,
+    ollamaOptions: normalizeOllamaGenerationOptions(optionOverrides),
   };
+}
+
+function getGenerateOptionsPayload(options: OllamaOptions | AppSettings) {
+  return toOllamaApiOptions(getOllamaConfig(options).ollamaOptions);
 }
 
 function idFromDate(prefix: string): string {
@@ -205,6 +235,60 @@ async function fetchWithTimeout(
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function listOllamaModels(
+  options: OllamaOptions | AppSettings = {},
+): Promise<{
+  baseUrl: string;
+  model: string;
+  models: OllamaModelSummary[];
+}> {
+  const { baseUrl, model } = getOllamaConfig(options);
+  const response = await fetchWithTimeout(`${baseUrl}/api/tags`, 3500);
+
+  if (!response.ok) {
+    throw await createOllamaError(response);
+  }
+
+  const data = (await response.json()) as OllamaTagsResponse;
+  const models =
+    data.models
+      ?.map((item): OllamaModelSummary | null => {
+        const name =
+          typeof item.name === "string"
+            ? item.name
+            : typeof item.model === "string"
+              ? item.model
+              : "";
+        if (!name) {
+          return null;
+        }
+        const modelName = typeof item.model === "string" ? item.model : name;
+        return {
+          name,
+          model: modelName,
+          modifiedAt:
+            typeof item.modified_at === "string" ? item.modified_at : null,
+          size: typeof item.size === "number" ? item.size : null,
+          family:
+            typeof item.details?.family === "string"
+              ? item.details.family
+              : null,
+          parameterSize:
+            typeof item.details?.parameter_size === "string"
+              ? item.details.parameter_size
+              : null,
+          quantizationLevel:
+            typeof item.details?.quantization_level === "string"
+              ? item.details.quantization_level
+              : null,
+        };
+      })
+      .filter((item): item is OllamaModelSummary => item !== null)
+      .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
+
+  return { baseUrl, model, models };
 }
 
 export async function checkOllamaStatus(
@@ -386,6 +470,7 @@ export async function generateLessonWithOllama(
       prompt,
       stream: false,
       format: "json",
+      options: getGenerateOptionsPayload(options),
     }),
   });
 
@@ -489,13 +574,24 @@ export async function generateConversationReply(
       : "Scenario: tourist Spanish practice.",
     lesson ? `Current lesson phrase: ${lesson.spanishPrompt}` : "",
     ...practiceFocusLines,
+    `AI response flavor: ${getAiFlavorInstruction(
+      options.aiResponseFlavor ?? DEFAULT_AI_RESPONSE_FLAVOR,
+    )}`,
+    getCustomAiInstructionLine(
+      options.customAiInstructions ?? DEFAULT_CUSTOM_AI_INSTRUCTIONS,
+    ) ?? "",
     `Student said: ${userText}`,
   ].join("\n");
 
   const response = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt, stream: false }),
+    body: JSON.stringify({
+      model,
+      prompt,
+      stream: false,
+      options: getGenerateOptionsPayload(options),
+    }),
   });
 
   if (!response.ok) {
@@ -531,7 +627,12 @@ export async function generateTravelAnswer(
   const response = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt, stream: false }),
+    body: JSON.stringify({
+      model,
+      prompt,
+      stream: false,
+      options: getGenerateOptionsPayload(options),
+    }),
   });
 
   if (!response.ok) {
