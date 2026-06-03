@@ -39,6 +39,10 @@ const hostGrotesk = Host_Grotesk({
 const IS_DEV = process.env.NODE_ENV !== "production";
 
 type FlowPhase = "pick-context" | "custom-details" | "lesson";
+type PresetStatus = {
+  presetId: string;
+  message: string;
+};
 
 const CONTEXT_PRESETS = [
   {
@@ -112,6 +116,7 @@ export default function Lessons() {
   const [scenario, setScenario] = useState("");
   const [level, setLevel] = useState<LessonLevel>("beginner");
   const [status, setStatus] = useState("");
+  const [presetStatus, setPresetStatus] = useState<PresetStatus | null>(null);
   const [lastLessonId, setLastLessonId] = useState<string | null>(null);
   const [stepSpeechText, setStepSpeechText] = useState("");
   const [practiceHint, setPracticeHint] = useState("");
@@ -190,6 +195,17 @@ export default function Lessons() {
     setLastPracticeAttempt(null);
   }
 
+  function showLessonLoadStatus(message: string, presetId?: string) {
+    if (presetId) {
+      setPresetStatus({ presetId, message });
+      setStatus("");
+      return;
+    }
+
+    setPresetStatus(null);
+    setStatus(message);
+  }
+
   useEffect(() => {
     if (!currentCurriculumSection) {
       return;
@@ -222,14 +238,15 @@ export default function Lessons() {
   ) {
     const trimmed = scenarioText.trim();
     if (!trimmed) {
-      setStatus("Describe a situation first.");
+      showLessonLoadStatus("Describe a situation first.", scenarioPresetId);
       return;
     }
 
-    setStatus(
+    showLessonLoadStatus(
       scenarioPresetId
         ? "Loading cached lesson or generating once..."
         : "Generating with Ollama...",
+      scenarioPresetId,
     );
     const response = await fetch("/api/lessons", {
       method: "POST",
@@ -243,7 +260,10 @@ export default function Lessons() {
     };
 
     if (!response.ok || !data.lesson) {
-      setStatus(data.error ?? "Could not generate lesson.");
+      showLessonLoadStatus(
+        data.error ?? "Could not generate lesson.",
+        scenarioPresetId,
+      );
       return;
     }
 
@@ -252,10 +272,12 @@ export default function Lessons() {
     resetStepPractice();
     setPhase("lesson");
     setStatus("");
+    setPresetStatus(null);
     setLastLessonId(data.lesson.id);
   }
 
   async function continueLastLesson() {
+    setPresetStatus(null);
     setStatus("Loading lesson...");
     try {
       const response = await fetch("/api/lessons");
@@ -352,6 +374,7 @@ export default function Lessons() {
     setStepIndex(0);
     setScenario("");
     setStatus("");
+    setPresetStatus(null);
     setStepSpeechText("");
     setPracticeHint("");
     stopListening();
@@ -376,6 +399,7 @@ export default function Lessons() {
   async function runDevCurriculumAction(
     action: "dev-complete-current-section" | "dev-reopen-previous-section",
   ) {
+    setPresetStatus(null);
     setStatus(
       action === "dev-complete-current-section"
         ? "Skipping current grammar section..."
@@ -514,7 +538,10 @@ export default function Lessons() {
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => setLevel(opt.id)}
+                      onClick={() => {
+                        setLevel(opt.id);
+                        setPresetStatus(null);
+                      }}
                       className={`rounded-full border px-4 py-2 text-sm font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 ${
                         level === opt.id
                           ? "border-orange-400/50 bg-orange-400/15 text-orange-100"
@@ -531,34 +558,45 @@ export default function Lessons() {
             <div className="flex flex-row gap-8 md:gap-12">
               <div className="grid flex-1 gap-4 sm:grid-cols-1">
                 {CONTEXT_PRESETS.map((ctx) => (
-                  <button
-                    key={ctx.id}
-                    type="button"
-                    onClick={() => {
-                      if (ctx.scenario === null) {
-                        setPhase("custom-details");
-                        setScenario("");
-                        return;
-                      }
-                      void generateLesson(ctx.scenario, ctx.id);
-                    }}
-                    className="group flex flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
-                  >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-400/12 text-orange-300 transition group-hover:bg-orange-400/20">
-                      <FontAwesomeIcon icon={ctx.icon} className="text-lg" />
-                    </span>
-                    <span className="mt-4 text-lg font-black text-white">
-                      {ctx.label}
-                    </span>
-                    <span className="mt-1 text-sm text-stone-400">
-                      {ctx.description}
-                    </span>
-                    <span className="mt-4 text-xs font-semibold text-orange-400/90 uppercase">
-                      {ctx.scenario === null
-                        ? "Create scenario →"
-                        : "Load lesson →"}
-                    </span>
-                  </button>
+                  <div key={ctx.id} className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (ctx.scenario === null) {
+                          setPresetStatus(null);
+                          setStatus("");
+                          setPhase("custom-details");
+                          setScenario("");
+                          return;
+                        }
+                        void generateLesson(ctx.scenario, ctx.id);
+                      }}
+                      className="group flex flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
+                    >
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-400/12 text-orange-300 transition group-hover:bg-orange-400/20">
+                        <FontAwesomeIcon icon={ctx.icon} className="text-lg" />
+                      </span>
+                      <span className="mt-4 text-lg font-black text-white">
+                        {ctx.label}
+                      </span>
+                      <span className="mt-1 text-sm text-stone-400">
+                        {ctx.description}
+                      </span>
+                      <span className="mt-4 text-xs font-semibold text-orange-400/90 uppercase">
+                        {ctx.scenario === null
+                          ? "Create scenario →"
+                          : "Load lesson →"}
+                      </span>
+                    </button>
+                    {presetStatus?.presetId === ctx.id ? (
+                      <p
+                        className="rounded-xl border border-orange-400/25 bg-orange-400/10 px-4 py-3 text-sm text-orange-100"
+                        role="status"
+                      >
+                        {presetStatus.message}
+                      </p>
+                    ) : null}
+                  </div>
                 ))}
               </div>
 
@@ -634,6 +672,7 @@ export default function Lessons() {
                   onClick={() => {
                     setPhase("pick-context");
                     setStatus("");
+                    setPresetStatus(null);
                   }}
                   className="inline-flex h-12 items-center justify-center rounded-full border border-stone-600 px-6 text-sm font-bold text-stone-200 hover:bg-stone-800"
                 >
