@@ -6,10 +6,14 @@ import {
   faChevronRight,
   faCheck,
   faBackward,
+  faBasketShopping,
   faForward,
+  faHotel,
+  faMapLocationDot,
   faMicrophone,
   faPenToSquare,
   faPills,
+  faPlaneArrival,
   faStop,
   faTrain,
   faUtensils,
@@ -23,7 +27,6 @@ import type {
   PracticeAttempt,
 } from "@/server/types";
 import type { CurriculumSection } from "@/lib/curriculum";
-import Image from "next/image";
 
 import { resolveLessonSteps } from "@/lib/lessonSteps";
 import { useSoundEffect } from "@/hooks/useSoundEffect";
@@ -48,7 +51,8 @@ const CONTEXT_PRESETS = [
   {
     id: "restaurant",
     label: "Ordering at a restaurant",
-    description: "Menus, allergies, paying the bill",
+    description:
+      "Menus, allergies, paying the bill, and other restaurant-related language.",
     scenario:
       "I'm ordering food and drinks at a sit-down restaurant near the beach in Spain as an English-speaking tourist.",
     icon: faUtensils,
@@ -56,7 +60,8 @@ const CONTEXT_PRESETS = [
   {
     id: "train",
     label: "Boarding a train",
-    description: "Tickets, platforms, and seats",
+    description:
+      "Tickets, platforms, seats, and other public transit-related language.",
     scenario:
       "I'm boarding and riding a regional train in Spain: tickets, finding the platform, and simple questions on board.",
     icon: faTrain,
@@ -64,15 +69,50 @@ const CONTEXT_PRESETS = [
   {
     id: "pharmacy",
     label: "At the pharmacy",
-    description: "Basic health and supplies",
+    description: "Symptoms, medications, and other health-related language.",
     scenario:
       "I'm visiting a Spanish pharmacy for minor travel needs: describing symptoms briefly and asking for common products.",
     icon: faPills,
   },
   {
+    id: "hotel",
+    label: "Checking into a hotel",
+    description:
+      "Reservations, room details, amenities, and polite front-desk requests.",
+    scenario:
+      "I'm checking into a hotel in Spain as an English-speaking tourist: confirming my reservation, asking about the room, and requesting basic amenities.",
+    icon: faHotel,
+  },
+  {
+    id: "directions",
+    label: "Asking for directions",
+    description: "Streets, landmarks, distances, and finding nearby places.",
+    scenario:
+      "I'm asking for directions in a Spanish city: finding streets, landmarks, bathrooms, cafes, and understanding simple route instructions.",
+    icon: faMapLocationDot,
+  },
+  {
+    id: "market",
+    label: "Shopping at a market",
+    description:
+      "Prices, quantities, sizes, produce, and simple checkout phrases.",
+    scenario:
+      "I'm shopping at a local Spanish market: asking prices, choosing produce, requesting quantities, and paying politely.",
+    icon: faBasketShopping,
+  },
+  {
+    id: "airport",
+    label: "Arriving at the airport",
+    description:
+      "Baggage, gates, delays, transportation, and arrival-related questions.",
+    scenario:
+      "I'm arriving at an airport in Spain as an English-speaking tourist: asking about baggage claim, gates, delays, taxis, and getting to my hotel.",
+    icon: faPlaneArrival,
+  },
+  {
     id: "custom",
     label: "Custom situation",
-    description: "Describe your own scenario",
+    description: "Describe your own scenario.",
     scenario: null,
     icon: faPenToSquare,
   },
@@ -468,10 +508,9 @@ export default function Lessons() {
               <h1 className="mt-3 text-2xl leading-tight font-black tracking-tight text-pretty text-white sm:text-3xl md:text-4xl">
                 Pick a real-life context
               </h1>
-              <p className="mt-3 max-w-2xl text-pretty text-stone-400">
-                Choose where you’ll use Spanish. The app builds a short
-                lesson—overview, vocabulary, grammar, a key phrase, and
-                practice—using the same AI as the generate button.
+              <p className="mx-auto mt-3 max-w-2xl text-pretty text-stone-400">
+                Choose where you will use Spanish. Then, take short AI-generated
+                lessons reviewing vocabulary, grammar, key phrases, and more.
               </p>
               {currentCurriculumSection ? (
                 <div className="mt-5 rounded-xl border border-orange-400/25 bg-orange-400/10 p-4 text-left">
@@ -555,8 +594,8 @@ export default function Lessons() {
               </fieldset>
             </section>
 
-            <div className="flex flex-row gap-8 md:gap-12">
-              <div className="grid flex-1 gap-4 sm:grid-cols-1">
+            <div className="flex flex-col gap-8 lg:flex-row lg:gap-12">
+              <div className="grid flex-1 gap-4 sm:grid-cols-2">
                 {CONTEXT_PRESETS.map((ctx) => (
                   <div key={ctx.id} className="flex flex-col gap-2">
                     <button
@@ -571,7 +610,7 @@ export default function Lessons() {
                         }
                         void generateLesson(ctx.scenario, ctx.id);
                       }}
-                      className="group flex flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
+                      className="group relative flex h-48 sm:h-56 flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
                     >
                       <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-400/12 text-orange-300 transition group-hover:bg-orange-400/20">
                         <FontAwesomeIcon icon={ctx.icon} className="text-lg" />
@@ -582,7 +621,7 @@ export default function Lessons() {
                       <span className="mt-1 text-sm text-stone-400">
                         {ctx.description}
                       </span>
-                      <span className="mt-4 text-xs font-semibold text-orange-400/90 uppercase">
+                      <span className="absolute bottom-5 sm:bottom-6 left-5 sm:left-6 text-xs font-semibold text-orange-400/90 uppercase">
                         {ctx.scenario === null
                           ? "Create scenario →"
                           : "Load lesson →"}
@@ -600,7 +639,7 @@ export default function Lessons() {
                 ))}
               </div>
 
-              <div className="animate-wiggle-less relative h-min">
+              {/* <div className="animate-wiggle-less relative h-min">
                 <div className="pointer-events-none absolute inset-x-8 top-0 h-px" />
                 <Image
                   src="/oye-tura-the-criatura-hat4.png"
@@ -610,7 +649,7 @@ export default function Lessons() {
                   className="mx-auto w-full max-w-xs object-contain drop-shadow-2xl drop-shadow-orange-300/30 sm:min-w-xs"
                   priority
                 />
-              </div>
+              </div> */}
             </div>
 
             {lastLessonId ? (
