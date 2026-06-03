@@ -120,6 +120,18 @@ const CONTEXT_PRESETS = [
 
 function stepKindLabel(kind: LessonStep["kind"]): string {
   switch (kind) {
+    case "goal":
+      return "Goal";
+    case "phrases":
+      return "Useful phrases";
+    case "breakdown":
+      return "Breakdown";
+    case "swap":
+      return "Swap words";
+    case "scenario":
+      return "Mini scenario";
+    case "review":
+      return "Review";
     case "overview":
       return "Overview";
     case "vocabulary":
@@ -140,7 +152,7 @@ function speechTextForStep(step: LessonStep, lesson: Lesson): string {
   if (phrase) {
     return phrase;
   }
-  if (step.kind === "vocabulary") {
+  if (step.kind === "vocabulary" || step.kind === "phrases" || step.kind === "swap") {
     const words = step.words?.length ? step.words : lesson.vocabulary;
     if (words.length > 0) {
       return words.map((w) => w.spanish).join(". ");
@@ -509,8 +521,9 @@ export default function Lessons() {
                 Pick a real-life context
               </h1>
               <p className="mx-auto mt-3 max-w-2xl text-pretty text-stone-400">
-                Choose where you will use Spanish. Then, take short AI-generated
-                lessons reviewing vocabulary, grammar, key phrases, and more.
+                Choose where you will use Spanish. The app builds a task-based
+                lesson with useful phrases, swaps, a mini scenario, and
+                practice using the same AI as the generate button.
               </p>
               {currentCurriculumSection ? (
                 <div className="mt-5 rounded-xl border border-orange-400/25 bg-orange-400/10 p-4 text-left">
@@ -681,7 +694,7 @@ export default function Lessons() {
             </h2>
             <p className="mt-2 text-sm text-stone-500">
               Describe the situation in English. The model turns it into
-              vocabulary, grammar notes, and a phrase you can practice.
+              useful phrases, word swaps, a mini scenario, and practice.
             </p>
             <div className="mt-4 flex flex-col gap-3">
               <textarea

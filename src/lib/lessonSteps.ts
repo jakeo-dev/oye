@@ -26,29 +26,46 @@ export function buildLessonStepsFromCore(lesson: {
 
   return [
     {
-      kind: "overview",
-      title: "Situation",
+      kind: "goal",
+      title: "Goal",
       body:
         lesson.touristFocus.trim() ||
-        `You're working on: ${lesson.title}. Focus on short, polite tourist Spanish.`,
+        `Use short, polite tourist Spanish for: ${lesson.title}.`,
     },
     {
-      kind: "vocabulary",
-      title: "Key words",
-      body: "Memorize these high-frequency words and short phrases for this scenario.",
+      kind: "phrases",
+      title: "Useful phrases",
+      body: "Start with language you can use immediately in this situation.",
       words: vocabWords,
-    },
-    {
-      kind: "grammar",
-      title: "Grammar pattern",
-      body: 'Many tourist requests use "quiero…" (I want) or "me gustaría…" (I would like). Keep verbs in the infinitive after them when you name what you want.',
       spanish: lesson.spanishPrompt || undefined,
       english: lesson.englishTranslation || undefined,
     },
     {
-      kind: "phrase",
-      title: "Useful line",
-      body: "Practice this line until it feels natural; it will carry you through the situation.",
+      kind: "breakdown",
+      title: "Break it down",
+      body: "Notice the building blocks: the request word, the thing you need, and the polite ending.",
+      spanish: lesson.spanishPrompt || undefined,
+      english: lesson.englishTranslation || undefined,
+    },
+    {
+      kind: "swap",
+      title: "Swap words",
+      body: "Keep the same sentence shape and swap in different useful words from the list.",
+      spanish: lesson.spanishPrompt,
+      english: lesson.englishTranslation,
+      words: vocabWords,
+    },
+    {
+      kind: "grammar",
+      title: "Grammar note",
+      body: 'Many tourist requests use "quiero..." (I want) or "me gustaria..." (I would like). Keep the next verb in the infinitive when you name what you want to do.',
+      spanish: lesson.spanishPrompt || undefined,
+      english: lesson.englishTranslation || undefined,
+    },
+    {
+      kind: "scenario",
+      title: "Mini scenario",
+      body: "Imagine the other person asks a simple follow-up. Answer with the phrase, then add one detail if you can.",
       spanish: lesson.spanishPrompt,
       english: lesson.englishTranslation,
     },
@@ -56,6 +73,13 @@ export function buildLessonStepsFromCore(lesson: {
       kind: "practice",
       title: "Try it",
       body: practiceBody,
+    },
+    {
+      kind: "review",
+      title: "Review",
+      body: "Remember the useful phrase, one word you can swap, and the polite ending. Use the phrase once more before finishing.",
+      spanish: lesson.spanishPrompt || undefined,
+      english: lesson.englishTranslation || undefined,
     },
   ];
 }

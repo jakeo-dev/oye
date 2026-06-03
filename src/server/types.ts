@@ -8,8 +8,14 @@ export type VocabularyItem = {
   english: string;
 };
 
-/** One screen in the in-app lesson flow (vocabulary → grammar → phrase, etc.). */
+/** One screen in the in-app lesson flow. Old step kinds remain supported for saved lessons. */
 export type LessonStepKind =
+  | "goal"
+  | "phrases"
+  | "breakdown"
+  | "swap"
+  | "scenario"
+  | "review"
   | "overview"
   | "vocabulary"
   | "grammar"

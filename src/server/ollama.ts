@@ -150,6 +150,21 @@ function normalizeStepKind(raw: unknown): LessonStepKind {
     .toLowerCase()
     .replace(/[^a-z]/g, "");
   const map: Record<string, LessonStepKind> = {
+    goal: "goal",
+    objective: "goal",
+    phrases: "phrases",
+    usefulphrases: "phrases",
+    phrasebook: "phrases",
+    breakdown: "breakdown",
+    breakitdown: "breakdown",
+    parts: "breakdown",
+    swap: "swap",
+    swaps: "swap",
+    substitutions: "swap",
+    scenario: "scenario",
+    miniscenario: "scenario",
+    review: "review",
+    recap: "review",
     overview: "overview",
     intro: "overview",
     context: "overview",
@@ -160,7 +175,6 @@ function normalizeStepKind(raw: unknown): LessonStepKind {
     phrase: "phrase",
     dialog: "phrase",
     practice: "practice",
-    review: "practice",
     drill: "practice",
   };
   return map[key] ?? "overview";
@@ -430,11 +444,11 @@ function buildLessonPrompt({
       ];
 
   return [
-    "Create a short multi-step Spanish lesson for an English-speaking tourist beginner in Alicante.",
+    "Create a short task-based Spanish lesson for an English-speaking tourist beginner in Alicante.",
     ...curriculumLines,
-    "Return only JSON with this exact shape (steps must be 4 to 6 items, in teaching order):",
-    '{"title":"string","scenario":"string","touristFocus":"string","spanishPrompt":"string","englishTranslation":"string","vocabulary":[{"spanish":"string","english":"string"}],"practiceQuestions":["string"],"steps":[{"kind":"overview|vocabulary|grammar|phrase|practice","title":"string","body":"string","words":[{"spanish":"string","english":"string"}],"spanish":"string","english":"string"}]}',
-    "Rules for steps: use kind overview first (set expectations), then vocabulary (include words array), grammar (explain the curriculum section clearly; spanish/english optional), phrase (key line in spanish + english), practice last (body with 2-4 prompts, no need for spanish field).",
+    "Return only JSON with this exact shape (steps must be 7 to 8 items, in teaching order):",
+    '{"title":"string","scenario":"string","touristFocus":"string","spanishPrompt":"string","englishTranslation":"string","vocabulary":[{"spanish":"string","english":"string"}],"practiceQuestions":["string"],"steps":[{"kind":"goal|phrases|breakdown|swap|grammar|scenario|practice|review","title":"string","body":"string","words":[{"spanish":"string","english":"string"}],"spanish":"string","english":"string"}]}',
+    "Rules for steps: goal first (what real-world task the learner can do), phrases second (2-4 immediately useful lines; include words array when helpful), breakdown third (explain the key phrase piece by piece), swap fourth (show substitutions the learner can make; include words array), grammar fifth (short contextual note), scenario sixth (tiny back-and-forth situation), practice seventh (one focused production task; body with 2-4 prompts), review last (3-5 things to remember).",
     "Omit optional fields when empty.",
     `AI response flavor: ${getAiFlavorInstruction(aiResponseFlavor)}`,
     customInstructionLine ?? "",
@@ -504,7 +518,10 @@ export async function generateLessonWithOllama(
   let mergedVocabulary = vocabulary;
   if (mergedVocabulary.length === 0) {
     const fromStep = steps.find(
-      (s) => s.kind === "vocabulary" && s.words && s.words.length > 0,
+      (s) =>
+        (s.kind === "phrases" || s.kind === "swap" || s.kind === "vocabulary") &&
+        s.words &&
+        s.words.length > 0,
     )?.words;
     if (fromStep?.length) {
       mergedVocabulary = fromStep;
