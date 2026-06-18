@@ -4,6 +4,8 @@ set -euo pipefail
 REPO_URL="${OYE_REPO_URL:-https://github.com/jakeo-dev/oye.git}"
 APP_DIR="${OYE_APP_DIR:-$HOME/oye}"
 MODEL="${OLLAMA_MODEL:-llama3.2}"
+PIPER_VOICE="${PIPER_VOICE:-es_ES-davefx-medium}"
+PIPER_DATA_DIR="${PIPER_DATA_DIR:-data/piper-voices}"
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
@@ -55,6 +57,19 @@ ensure_ollama() {
   brew install --cask ollama
 }
 
+ensure_piper() {
+  echo "Installing Piper text-to-speech..."
+  python3 -m venv .venv-piper
+  .venv-piper/bin/python -m pip install --upgrade pip
+  .venv-piper/bin/python -m pip install "piper-tts[http]"
+
+  mkdir -p "$PIPER_DATA_DIR"
+  echo "Downloading Piper voice: $PIPER_VOICE"
+  .venv-piper/bin/python -m piper.download_voices \
+    --data-dir "$PIPER_DATA_DIR" \
+    "$PIPER_VOICE"
+}
+
 checkout_repo() {
   if is_oye_repo; then
     return
@@ -85,11 +100,14 @@ main() {
   ensure_homebrew
   ensure_command_with_brew git git
   ensure_command_with_brew node node
+  ensure_command_with_brew python3 python
   ensure_ollama
   checkout_repo
 
   echo "Installing app dependencies..."
   npm install
+
+  ensure_piper
 
   start_ollama
   echo "Pulling Ollama model: $MODEL"

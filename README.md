@@ -46,11 +46,34 @@ Manual prerequisites:
 - Git or Apple Command Line Tools
 - Node.js 20 or newer
 - npm
+- Python 3
 - Ollama for macOS
 
 ## Start Learning
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to start using ¡Oye!
+
+## Local Spanish Text To Speech
+
+¡Oye! uses Piper for read-aloud Spanish audio. The setup scripts create a local
+`.venv-piper` environment and download the default `es_ES-davefx-medium` voice
+into `data/piper-voices`.
+
+You can change the voice or Piper runtime with environment variables:
+
+```bash
+PIPER_VOICE=es_ES-davefx-medium
+PIPER_DATA_DIR=data/piper-voices
+PIPER_LENGTH_SCALE=1.05
+PIPER_PYTHON=.venv-piper/bin/python
+```
+
+If you run Piper's HTTP server separately, set `PIPER_BASE_URL` and the app will
+use that instead of starting the Piper CLI for each phrase:
+
+```bash
+PIPER_BASE_URL=http://localhost:5000
+```
 
 ## Local Mac Reminders
 

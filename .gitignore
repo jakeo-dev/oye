@@ -20,6 +20,8 @@
 # production
 /build
 /data/*.json
+/data/piper-voices/
+/.venv-piper/
 
 # misc
 .DS_Store
