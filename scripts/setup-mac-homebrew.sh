@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_URL="${OYE_REPO_URL:-https://github.com/jakeo-dev/oye.git}"
 APP_DIR="${OYE_APP_DIR:-$HOME/oye}"
 MODEL="${OLLAMA_MODEL:-llama3.2}"
-PIPER_VOICE="${PIPER_VOICE:-es_ES-davefx-medium}"
+PIPER_VOICE="${PIPER_VOICE:-es_ES-carlfm-x_low}"
 PIPER_DATA_DIR="${PIPER_DATA_DIR:-data/piper-voices}"
 
 command_exists() {

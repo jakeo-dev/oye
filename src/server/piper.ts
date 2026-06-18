@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const DEFAULT_VOICE = "es_ES-davefx-medium";
+const DEFAULT_VOICE = "es_ES-carlfm-x_low";
 const DEFAULT_DATA_DIR = "data/piper-voices";
 const DEFAULT_LENGTH_SCALE = 1.05;
 const DEFAULT_TIMEOUT_MS = 20_000;

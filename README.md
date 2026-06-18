@@ -56,13 +56,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to start u
 ## Local Spanish Text To Speech
 
 ¡Oye! uses Piper for read-aloud Spanish audio. The setup scripts create a local
-`.venv-piper` environment and download the default `es_ES-davefx-medium` voice
+`.venv-piper` environment and download the default `es_ES-carlfm-x_low` voice
 into `data/piper-voices`.
 
 You can change the voice or Piper runtime with environment variables:
 
 ```bash
-PIPER_VOICE=es_ES-davefx-medium
+PIPER_VOICE=es_ES-carlfm-x_low
 PIPER_DATA_DIR=data/piper-voices
 PIPER_LENGTH_SCALE=1.05
 PIPER_PYTHON=.venv-piper/bin/python
