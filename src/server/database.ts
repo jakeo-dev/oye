@@ -109,6 +109,41 @@ export async function saveLesson(lesson: Lesson): Promise<Lesson> {
   return lesson;
 }
 
+export async function clearSavedLearningData(): Promise<{
+  lessons: number;
+  cachedLessons: number;
+  progress: number;
+  conversationMessages: number;
+  practiceAttempts: number;
+  practiceMistakes: number;
+  dailyProgress: number;
+  curriculumProgress: number;
+}> {
+  const database = await readDatabase();
+  const deletedCounts = {
+    lessons: database.lessons.length,
+    cachedLessons: database.lessonCache.length,
+    progress: database.progress.length,
+    conversationMessages: database.conversationMessages.length,
+    practiceAttempts: database.practiceAttempts.length,
+    practiceMistakes: database.practiceMistakes.length,
+    dailyProgress: database.dailyProgress.length,
+    curriculumProgress: database.curriculumProgress.length,
+  };
+
+  database.lessons = [];
+  database.lessonCache = [];
+  database.progress = [];
+  database.conversationMessages = [];
+  database.practiceAttempts = [];
+  database.practiceMistakes = [];
+  database.dailyProgress = [];
+  database.curriculumProgress = [];
+
+  await writeDatabase(database);
+  return deletedCounts;
+}
+
 export function getLessonCacheKey({
   scenarioPresetId,
   curriculumSectionId,

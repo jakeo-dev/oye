@@ -15,6 +15,9 @@ type AskMessage = {
   content: string;
 };
 
+const ASK_MESSAGES_STORAGE_KEY = "oye:ask-messages";
+const ASK_HISTORY_CLEARED_EVENT = "oye:ask-history-cleared";
+
 function TypingIndicator() {
   return (
     <div
@@ -51,9 +54,60 @@ function newMessage(role: AskMessage["role"], content: string): AskMessage {
 export default function Ask() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<AskMessage[]>([]);
+  const [hasLoadedSavedMessages, setHasLoadedSavedMessages] = useState(false);
   const [status, setStatus] = useState("");
   const [isAwaitingAnswer, setIsAwaitingAnswer] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      try {
+        const savedMessages = window.localStorage.getItem(
+          ASK_MESSAGES_STORAGE_KEY,
+        );
+        if (savedMessages) {
+          setMessages(JSON.parse(savedMessages) as AskMessage[]);
+        }
+      } catch {
+        window.localStorage.removeItem(ASK_MESSAGES_STORAGE_KEY);
+      } finally {
+        setHasLoadedSavedMessages(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedSavedMessages) {
+      return;
+    }
+
+    if (messages.length === 0) {
+      window.localStorage.removeItem(ASK_MESSAGES_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      ASK_MESSAGES_STORAGE_KEY,
+      JSON.stringify(messages),
+    );
+  }, [hasLoadedSavedMessages, messages]);
+
+  useEffect(() => {
+    function clearSavedAskHistory() {
+      setMessages([]);
+      setStatus("");
+    }
+
+    window.addEventListener(ASK_HISTORY_CLEARED_EVENT, clearSavedAskHistory);
+    return () => {
+      window.removeEventListener(
+        ASK_HISTORY_CLEARED_EVENT,
+        clearSavedAskHistory,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -178,6 +232,7 @@ export default function Ask() {
               onClick={() => {
                 setMessages([]);
                 setStatus("");
+                window.localStorage.removeItem(ASK_MESSAGES_STORAGE_KEY);
               }}
               disabled={messages.length === 0 || isAwaitingAnswer}
               aria-label="Clear answers"

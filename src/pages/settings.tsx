@@ -163,6 +163,7 @@ export default function Settings() {
   const [customAiInstructions, setCustomAiInstructions] = useState(
     DEFAULT_CUSTOM_AI_INSTRUCTIONS,
   );
+  const [isClearingStudyData, setIsClearingStudyData] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const playSound = useSoundEffect();
 
@@ -434,6 +435,35 @@ export default function Settings() {
     }
   }
 
+  async function clearSavedStudyData() {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Delete saved lessons and conversations? This also clears lesson progress, practice attempts, and cached lessons.",
+      )
+    ) {
+      return;
+    }
+
+    setIsClearingStudyData(true);
+    try {
+      const response = await fetch("/api/settings/data", { method: "DELETE" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not delete saved study data.");
+      }
+      window.localStorage.removeItem("oye:ask-messages");
+      window.dispatchEvent(new Event("oye:ask-history-cleared"));
+      window.dispatchEvent(new Event("oye:progress-updated"));
+      showToast("Saved lessons and conversations deleted.");
+      playSound("success");
+    } catch {
+      showToast("Could not delete saved lessons and conversations.");
+    } finally {
+      setIsClearingStudyData(false);
+    }
+  }
+
   function updateOllamaOption(id: OllamaGenerationOptionId, rawValue: string) {
     setOllamaOptions((current) =>
       normalizeOllamaGenerationOptions({
@@ -685,17 +715,29 @@ export default function Settings() {
               Data on this device
             </h2>
             <p className="mt-1 text-sm text-stone-400">
-              Reset saved preferences. Your lessons and conversation history are
-              not deleted.
+              Reset preferences or delete saved lesson and conversation history.
             </p>
-            <button
-              type="button"
-              onClick={clearSavedPreferences}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm font-bold text-red-200 transition outline-none hover:bg-red-950/50 focus-visible:ring-2 focus-visible:ring-red-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
-            >
-              <FontAwesomeIcon icon={faTrashCan} className="text-base" />
-              Clear saved preferences
-            </button>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={clearSavedPreferences}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm font-bold text-red-200 transition outline-none hover:bg-red-950/50 focus-visible:ring-2 focus-visible:ring-red-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
+              >
+                <FontAwesomeIcon icon={faTrashCan} className="text-base" />
+                Clear saved preferences
+              </button>
+              <button
+                type="button"
+                onClick={() => void clearSavedStudyData()}
+                disabled={isClearingStudyData}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm font-bold text-red-200 transition outline-none hover:bg-red-950/50 focus-visible:ring-2 focus-visible:ring-red-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FontAwesomeIcon icon={faTrashCan} className="text-base" />
+                {isClearingStudyData
+                  ? "Deleting..."
+                  : "Delete lessons and conversations"}
+              </button>
+            </div>
           </section>
 
           <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
