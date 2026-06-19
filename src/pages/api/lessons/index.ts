@@ -79,9 +79,18 @@ export default async function handler(
             ollamaOptions: body.ollamaOptions ?? settings.ollamaOptions,
             aiResponseFlavor: settings.aiResponseFlavor,
             customAiInstructions: settings.customAiInstructions,
+          }).catch((error) => {
+            const fallbackLesson = generateFallbackLesson(generationInput);
+            return {
+              ...fallbackLesson,
+              touristFocus:
+                error instanceof Error
+                  ? `Generated offline fallback because Ollama failed: ${error.message}`
+                  : fallbackLesson.touristFocus,
+            };
           });
 
-      if (generationInput.scenarioPresetId) {
+      if (generationInput.scenarioPresetId && lesson.source === "ollama") {
         await saveCachedLesson({
           scenarioPresetId: generationInput.scenarioPresetId,
           curriculumSectionId,
@@ -95,7 +104,14 @@ export default async function handler(
         });
       }
       await saveLesson(lesson);
-      res.status(201).json({ lesson, cacheHit: false });
+      res.status(201).json({
+        lesson,
+        cacheHit: false,
+        warning:
+          lesson.source === "fallback"
+            ? "Ollama did not respond in time, so a fallback lesson was generated."
+            : undefined,
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not generate lesson.";

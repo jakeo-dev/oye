@@ -97,8 +97,15 @@ export function getOllamaConfig(options: OllamaOptions | AppSettings = {}) {
   };
 }
 
-function getGenerateOptionsPayload(options: OllamaOptions | AppSettings) {
-  return toOllamaApiOptions(getOllamaConfig(options).ollamaOptions);
+function getGenerateOptionsPayload(
+  options: OllamaOptions | AppSettings,
+  fallbackNumPredict: number,
+) {
+  const payload = toOllamaApiOptions(getOllamaConfig(options).ollamaOptions);
+  if (payload.num_predict < 1) {
+    payload.num_predict = fallbackNumPredict;
+  }
+  return payload;
 }
 
 function idFromDate(prefix: string): string {
@@ -241,13 +248,39 @@ function modelNameMatches(
 async function fetchWithTimeout(
   url: string,
   timeoutMs: number,
+  init?: RequestInit,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { signal: controller.signal });
+    return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+function createTimeoutError(timeoutMs: number): Error {
+  return new Error(
+    `Ollama took longer than ${Math.round(timeoutMs / 1000)} seconds to respond.`,
+  );
+}
+
+async function fetchOllamaGenerate(
+  baseUrl: string,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<Response> {
+  try {
+    return await fetchWithTimeout(`${baseUrl}/api/generate`, timeoutMs, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw createTimeoutError(timeoutMs);
+    }
+    throw error;
   }
 }
 
@@ -476,17 +509,17 @@ export async function generateLessonWithOllama(
       options.customAiInstructions ?? DEFAULT_CUSTOM_AI_INSTRUCTIONS,
   });
 
-  const response = await fetch(`${baseUrl}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const response = await fetchOllamaGenerate(
+    baseUrl,
+    {
       model,
       prompt,
       stream: false,
       format: "json",
-      options: getGenerateOptionsPayload(options),
-    }),
-  });
+      options: getGenerateOptionsPayload(options, 1200),
+    },
+    35000,
+  );
 
   if (!response.ok) {
     throw await createOllamaError(response);
@@ -600,16 +633,16 @@ export async function generateConversationReply(
     `Student said: ${userText}`,
   ].join("\n");
 
-  const response = await fetch(`${baseUrl}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const response = await fetchOllamaGenerate(
+    baseUrl,
+    {
       model,
       prompt,
       stream: false,
-      options: getGenerateOptionsPayload(options),
-    }),
-  });
+      options: getGenerateOptionsPayload(options, 512),
+    },
+    30000,
+  );
 
   if (!response.ok) {
     throw await createOllamaError(response);
@@ -641,16 +674,16 @@ export async function generateTravelAnswer(
     `Question: ${question}`,
   ].join("\n");
 
-  const response = await fetch(`${baseUrl}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const response = await fetchOllamaGenerate(
+    baseUrl,
+    {
       model,
       prompt,
       stream: false,
-      options: getGenerateOptionsPayload(options),
-    }),
-  });
+      options: getGenerateOptionsPayload(options, 384),
+    },
+    25000,
+  );
 
   if (!response.ok) {
     throw await createOllamaError(response);

@@ -40,6 +40,7 @@ const hostGrotesk = Host_Grotesk({
 });
 
 const IS_DEV = process.env.NODE_ENV !== "production";
+const LESSON_TIMEOUT_MS = 40000;
 
 type FlowPhase = "pick-context" | "custom-details" | "lesson";
 type PresetStatus = {
@@ -159,6 +160,20 @@ function speechTextForStep(step: LessonStep, lesson: Lesson): string {
     }
   }
   return lesson.spanishPrompt.trim() || "Hola, ¿cómo estás?";
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 export default function Lessons() {
@@ -300,32 +315,46 @@ export default function Lessons() {
         : "Generating with Ollama...",
       scenarioPresetId,
     );
-    const response = await fetch("/api/lessons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scenario: trimmed, scenarioPresetId, level }),
-    });
-    const data = (await response.json()) as {
-      lesson?: Lesson;
-      error?: string;
-      cacheHit?: boolean;
-    };
+    try {
+      const response = await fetchWithTimeout(
+        "/api/lessons",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scenario: trimmed, scenarioPresetId, level }),
+        },
+        LESSON_TIMEOUT_MS,
+      );
+      const data = (await response.json()) as {
+        lesson?: Lesson;
+        error?: string;
+        cacheHit?: boolean;
+        warning?: string;
+      };
 
-    if (!response.ok || !data.lesson) {
+      if (!response.ok || !data.lesson) {
+        showLessonLoadStatus(
+          data.error ?? "Could not generate lesson.",
+          scenarioPresetId,
+        );
+        return;
+      }
+
+      setLesson(data.lesson);
+      setStepIndex(0);
+      resetStepPractice();
+      setPhase("lesson");
+      setStatus(data.warning ?? "");
+      setPresetStatus(null);
+      setLastLessonId(data.lesson.id);
+    } catch (error) {
       showLessonLoadStatus(
-        data.error ?? "Could not generate lesson.",
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Ollama is taking too long to generate this lesson. Try again or choose a smaller model."
+          : "Could not reach the lesson service. Check that the app backend is running.",
         scenarioPresetId,
       );
-      return;
     }
-
-    setLesson(data.lesson);
-    setStepIndex(0);
-    resetStepPractice();
-    setPhase("lesson");
-    setStatus("");
-    setPresetStatus(null);
-    setLastLessonId(data.lesson.id);
   }
 
   async function continueLastLesson() {
@@ -826,9 +855,9 @@ export default function Lessons() {
 
                   {currentStep.words && currentStep.words.length > 0 ? (
                     <ul className="mt-5 divide-y divide-stone-700/80 rounded-xl border border-stone-700/60 bg-stone-950/40">
-                      {currentStep.words.map((item) => (
+                      {currentStep.words.map((item, itemIndex) => (
                         <li
-                          key={`${item.spanish}-${item.english}`}
+                          key={`${item.spanish}-${item.english}-${itemIndex}`}
                           className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3.5 sm:px-5"
                         >
                           <span className="font-bold text-orange-100">
@@ -968,8 +997,8 @@ export default function Lessons() {
                   Extra prompts
                 </h3>
                 <ul className="mt-3 list-disc space-y-2 pl-5 text-stone-300">
-                  {lesson.practiceQuestions.map((q) => (
-                    <li key={q} className="text-pretty">
+                  {lesson.practiceQuestions.map((q, questionIndex) => (
+                    <li key={`${q}-${questionIndex}`} className="text-pretty">
                       {q}
                     </li>
                   ))}

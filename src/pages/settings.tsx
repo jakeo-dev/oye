@@ -14,8 +14,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Host_Grotesk } from "next/font/google";
 
-import Image from "next/image";
-
 import {
   AI_RESPONSE_FLAVORS,
   DEFAULT_CUSTOM_AI_INSTRUCTIONS,
@@ -491,7 +489,7 @@ export default function Settings() {
         aria-hidden
       />
 
-      <div className="relative mx-auto w-full max-w-300 px-8 py-12">
+      <div className="relative mx-auto w-full max-w-220 px-8 py-12">
         <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg ring-1 shadow-black/25 ring-white/5 backdrop-blur-sm sm:p-7">
           <div
             className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
@@ -954,17 +952,6 @@ export default function Settings() {
                     </button>
                   </div>
                 </div>
-              </div>
-              <div className="animate-wiggle-less relative h-min">
-                <div className="pointer-events-none absolute inset-x-8 top-0 h-px" />
-                <Image
-                  src="/oye-tura-the-criatura-hat3.png"
-                  width={400}
-                  height={500}
-                  alt="Tura the Criatura"
-                  className="mx-auto w-full max-w-xs object-contain drop-shadow-2xl drop-shadow-orange-300/30 sm:min-w-2xs"
-                  priority
-                />
               </div>
             </div>
           </section>

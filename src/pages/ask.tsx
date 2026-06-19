@@ -17,6 +17,7 @@ type AskMessage = {
 
 const ASK_MESSAGES_STORAGE_KEY = "oye:ask-messages";
 const ASK_HISTORY_CLEARED_EVENT = "oye:ask-history-cleared";
+const ASK_TIMEOUT_MS = 30000;
 
 function TypingIndicator() {
   return (
@@ -49,6 +50,20 @@ function newMessage(role: AskMessage["role"], content: string): AskMessage {
     role,
     content,
   };
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 export default function Ask() {
@@ -125,11 +140,15 @@ export default function Ask() {
     setIsAwaitingAnswer(true);
 
     try {
-      const response = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmedQuestion }),
-      });
+      const response = await fetchWithTimeout(
+        "/api/ask",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: trimmedQuestion }),
+        },
+        ASK_TIMEOUT_MS,
+      );
       const data = (await response.json()) as {
         answer?: string;
         error?: string;
@@ -144,6 +163,12 @@ export default function Ask() {
         ...current,
         newMessage("assistant", data.answer ?? ""),
       ]);
+    } catch (error) {
+      setStatus(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Ollama is taking too long to answer. Try restarting Ollama or choosing a smaller model."
+          : "Could not reach the Ask service. Check that the app backend is running.",
+      );
     } finally {
       setIsAwaitingAnswer(false);
     }
