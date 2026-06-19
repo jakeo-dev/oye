@@ -22,8 +22,8 @@ export type UseSpanishPromptSpeechOptions = {
 };
 
 /**
- * Read aloud the lesson Spanish prompt (or fallback) using the browser
- * Speech Synthesis API. Click again while speaking to stop.
+ * Read aloud the lesson Spanish prompt (or fallback) using Piper through the
+ * app's audio endpoint. Click again while speaking to stop.
  */
 export function useSpanishPromptSpeech(
   lesson: Lesson | null,
@@ -33,56 +33,76 @@ export function useSpanishPromptSpeech(
   const [isSpeaking, setIsSpeaking] = useState(false);
   const promptText = getPromptText(lesson, options?.textOverride);
   const onErrorRef = useRef(onError);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
 
-  useEffect(() => {
-    return () => {
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
+  const stopSpeaking = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    audioRef.current = null;
+    setIsSpeaking(false);
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const timeoutId = window.setTimeout(() => setIsSpeaking(false), 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [promptText]);
+    return () => stopSpeaking();
+  }, [stopSpeaking]);
+
+  useEffect(() => {
+    stopSpeaking();
+  }, [promptText, stopSpeaking]);
 
   const toggleSpeakPrompt = useCallback(() => {
     if (typeof window === "undefined") {
       return;
     }
-    const synth = window.speechSynthesis;
-    if (!synth) {
-      onErrorRef.current?.("Read aloud is not supported in this browser.");
+
+    if (audioRef.current) {
+      stopSpeaking();
       return;
     }
 
-    if (synth.speaking) {
-      synth.cancel();
-      setIsSpeaking(false);
-      return;
-    }
+    const params = new URLSearchParams({ text: promptText });
+    const audio = new Audio(`/api/tts?${params.toString()}`);
+    audio.preload = "auto";
+    audioRef.current = audio;
 
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(promptText);
-    utterance.lang = "es-ES";
-    utterance.rate = 0.95;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      onErrorRef.current?.("Could not play the prompt aloud.");
+    audio.onended = () => {
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+        setIsSpeaking(false);
+      }
     };
+    audio.onerror = () => {
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
+      setIsSpeaking(false);
+      onErrorRef.current?.(
+        "Could not play the prompt aloud. Make sure Piper is running and the Spanish voice is installed.",
+      );
+    };
+
     setIsSpeaking(true);
-    synth.speak(utterance);
-  }, [promptText]);
+    void audio.play().catch(() => {
+      if (audioRef.current !== audio) {
+        return;
+      }
+      audioRef.current = null;
+      setIsSpeaking(false);
+      onErrorRef.current?.("Could not start audio playback.");
+    });
+  }, [promptText, stopSpeaking]);
 
   return { toggleSpeakPrompt, isSpeaking, promptText };
 }
