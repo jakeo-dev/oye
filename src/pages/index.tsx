@@ -78,7 +78,7 @@ export default function Home() {
                 : "https://github.com/jakeo-dev/oye#quick-start-on-macos"
             }
             target={isLocal ? "" : "_blank"}
-            className="shrink-0 rounded-full border border-stone-600/80 bg-stone-800/80 px-5 py-2.5 text-base font-black text-stone-100 shadow-lg transition outline-none hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-200 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 md:text-lg"
+            className="shrink-0 cursor-pointer rounded-full border border-stone-600/80 bg-stone-800/80 px-5 py-2.5 text-base font-black text-stone-100 shadow-lg transition outline-none hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-200 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 md:text-lg"
           >
             {isLocal ? "Open App" : "Install"}
           </Link>
@@ -109,7 +109,7 @@ export default function Home() {
                     : "https://github.com/jakeo-dev/oye#quick-start-on-macos"
                 }
                 target={isLocal ? "" : "_blank"}
-                className="inline-flex items-center gap-2 rounded-full bg-orange-400 px-7 py-3 text-lg font-black text-stone-950 shadow-lg shadow-orange-500/20 transition outline-none hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-orange-400 px-7 py-3 text-lg font-black text-stone-950 shadow-lg shadow-orange-500/20 transition outline-none hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
               >
                 {isLocal ? "Start Learning" : "Install"}
                 <FontAwesomeIcon icon={faArrowRight} className="text-sm" />
@@ -214,7 +214,7 @@ export default function Home() {
                 : "https://github.com/jakeo-dev/oye#quick-start-on-macos"
             }
             target={isLocal ? "" : "_blank"}
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-orange-400 px-8 py-4 text-xl font-black text-stone-950 shadow-lg shadow-orange-500/25 transition outline-none hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
+            className="mt-8 inline-flex cursor-pointer items-center gap-2 rounded-full bg-orange-400 px-8 py-4 text-xl font-black text-stone-950 shadow-lg shadow-orange-500/25 transition outline-none hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
           >
             {isLocal ? "Enter ¡Oye!" : "Install ¡Oye!"}
             <FontAwesomeIcon icon={faArrowRight} className="text-base" />

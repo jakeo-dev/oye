@@ -551,7 +551,7 @@ export default function Lessons() {
                             "dev-reopen-previous-section",
                           )
                         }
-                        className="inline-flex items-center gap-2 rounded-full border border-orange-300/40 px-3 py-1.5 text-xs font-bold text-orange-100 transition hover:bg-orange-300/10"
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-orange-300/40 px-3 py-1.5 text-xs font-bold text-orange-100 transition hover:bg-orange-300/10"
                       >
                         <FontAwesomeIcon
                           icon={faBackward}
@@ -566,7 +566,7 @@ export default function Lessons() {
                             "dev-complete-current-section",
                           )
                         }
-                        className="inline-flex items-center gap-2 rounded-full border border-orange-300/40 px-3 py-1.5 text-xs font-bold text-orange-100 transition hover:bg-orange-300/10"
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-orange-300/40 px-3 py-1.5 text-xs font-bold text-orange-100 transition hover:bg-orange-300/10"
                       >
                         <FontAwesomeIcon icon={faForward} className="text-xs" />
                         Dev skip section
@@ -594,7 +594,7 @@ export default function Lessons() {
                         setLevel(opt.id);
                         setPresetStatus(null);
                       }}
-                      className={`rounded-full border px-4 py-2 text-sm font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 ${
+                      className={`cursor-pointer rounded-full border px-4 py-2 text-sm font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 ${
                         level === opt.id
                           ? "border-orange-400/50 bg-orange-400/15 text-orange-100"
                           : "border-stone-600 bg-stone-800/50 text-stone-300 hover:border-stone-500"
@@ -623,7 +623,7 @@ export default function Lessons() {
                         }
                         void generateLesson(ctx.scenario, ctx.id);
                       }}
-                      className="group relative flex h-48 sm:h-56 flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:p-6"
+                      className="group relative flex h-48 cursor-pointer flex-col rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 text-left shadow-lg ring-1 shadow-black/20 ring-white/5 transition hover:border-orange-400/35 hover:bg-stone-900/65 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:h-56 sm:p-6"
                     >
                       <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-400/12 text-orange-300 transition group-hover:bg-orange-400/20">
                         <FontAwesomeIcon icon={ctx.icon} className="text-lg" />
@@ -671,7 +671,7 @@ export default function Lessons() {
                 <button
                   type="button"
                   onClick={() => void continueLastLesson()}
-                  className="font-bold text-orange-400 underline-offset-2 hover:underline"
+                  className="cursor-pointer font-bold text-orange-400 underline-offset-2 hover:underline"
                 >
                   open your most recent lesson
                 </button>
@@ -711,7 +711,7 @@ export default function Lessons() {
                   onClick={() => {
                     void generateLesson(scenario);
                   }}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 transition outline-none hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:px-8"
+                  className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 transition outline-none hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:px-8"
                 >
                   <FontAwesomeIcon
                     icon={faWandMagicSparkles}
@@ -726,7 +726,7 @@ export default function Lessons() {
                     setStatus("");
                     setPresetStatus(null);
                   }}
-                  className="inline-flex h-12 items-center justify-center rounded-full border border-stone-600 px-6 text-sm font-bold text-stone-200 hover:bg-stone-800"
+                  className="inline-flex h-12 cursor-pointer items-center justify-center rounded-full border border-stone-600 px-6 text-sm font-bold text-stone-200 hover:bg-stone-800"
                 >
                   Back to contexts
                 </button>
@@ -765,7 +765,7 @@ export default function Lessons() {
                 <button
                   type="button"
                   onClick={newLessonFlow}
-                  className="shrink-0 rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-300 hover:bg-stone-800"
+                  className="shrink-0 cursor-pointer rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-300 hover:bg-stone-800"
                 >
                   New context
                 </button>
@@ -846,7 +846,7 @@ export default function Lessons() {
                     <button
                       type="button"
                       onClick={() => toggleSpeakPrompt()}
-                      className={`flex h-11 w-11 items-center justify-center rounded-full border bg-stone-800/80 transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
+                      className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border bg-stone-800/80 transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
                         isSpeakingPrompt
                           ? "border-orange-400/50 text-orange-200 hover:border-orange-300/60 hover:bg-orange-400/15"
                           : "border-stone-600/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
@@ -877,7 +877,7 @@ export default function Lessons() {
                       <button
                         type="button"
                         onClick={toggleListening}
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-full border font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
+                        className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center self-end rounded-full border font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
                           isListening
                             ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
                             : "border-stone-600/80 bg-stone-800/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
@@ -905,7 +905,7 @@ export default function Lessons() {
                         type="button"
                         onClick={() => void saveStepPractice()}
                         disabled={isSavingPractice}
-                        className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-orange-400 px-5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-orange-400 px-5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <FontAwesomeIcon icon={faCheck} className="text-sm" />
                         Check
@@ -933,7 +933,7 @@ export default function Lessons() {
                     setStepIndex((i) => Math.max(0, i - 1));
                   }}
                   disabled={stepIndex === 0}
-                  className="inline-flex items-center gap-2 rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
                   Back
@@ -948,7 +948,7 @@ export default function Lessons() {
                       setStepIndex((i) => Math.min(steps.length - 1, i + 1));
                     }
                   }}
-                  className="inline-flex items-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 shadow-lg shadow-orange-500/15 transition hover:bg-orange-300"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 shadow-lg shadow-orange-500/15 transition hover:bg-orange-300"
                 >
                   {isLastStep ? "Finish" : "Next"}
                   {isLastStep ? null : (

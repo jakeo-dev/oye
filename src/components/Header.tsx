@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 
@@ -14,7 +14,7 @@ import { faGithub } from "@fortawesome/free-brands-svg-icons";
 import { faGear, faHouse } from "@fortawesome/free-solid-svg-icons";
 
 const iconButtonClassName =
-  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-600/80 bg-stone-800/80 text-orange-400 outline-none transition hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950";
+  "flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-stone-600/80 bg-stone-800/80 text-orange-400 outline-none transition hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950";
 
 type AppHeaderProps = {
   showBackButton?: boolean;
@@ -122,7 +122,7 @@ export default function Header({ showProgressBar = false }: AppHeaderProps) {
       <div className="relative mx-auto flex w-full max-w-220 items-center gap-4 px-8 py-4">
         <Link
           href="/home"
-          className="group shrink-0 outline-none focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
+          className="group shrink-0 cursor-pointer outline-none focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
         >
           <h1 className="text-2xl leading-none font-black tracking-tight text-white transition group-hover:text-orange-100 sm:text-3xl">
             ¡Oye!

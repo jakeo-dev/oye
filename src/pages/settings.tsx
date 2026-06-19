@@ -113,7 +113,7 @@ function SettingSwitch({
         aria-labelledby={`${id}-label`}
         aria-describedby={`${id}-desc`}
         onClick={() => onChange(!checked)}
-        className={`relative h-8 w-14 shrink-0 rounded-full border transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
+        className={`relative h-8 w-14 shrink-0 cursor-pointer rounded-full border transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
           checked
             ? "border-orange-400/50 bg-orange-400"
             : "border-stone-600 bg-stone-800"
@@ -562,7 +562,7 @@ export default function Settings() {
                 value={dailyGoalMinutes}
                 onChange={(e) => persistDailyGoal(e.target.value)}
                 disabled={!mounted}
-                className="mt-3 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50 sm:mt-0 sm:w-44"
+                className="mt-3 h-11 w-full cursor-pointer rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 sm:w-44"
               >
                 <option value="5">5 minutes</option>
                 <option value="10">10 minutes</option>
@@ -582,7 +582,7 @@ export default function Settings() {
                 value={reminderTime}
                 onChange={(e) => void persistReminderTime(e.target.value)}
                 disabled={!mounted || !remindersEnabled}
-                className="mt-3 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50 sm:mt-0 sm:w-44"
+                className="mt-3 h-11 w-full cursor-pointer rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 sm:w-44"
                 aria-label="Practice reminder time"
               />
             </div>
@@ -602,7 +602,7 @@ export default function Settings() {
               <button
                 type="button"
                 onClick={() => void testMacReminder()}
-                className="mt-3 inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
+                className="mt-3 inline-flex cursor-pointer items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
               >
                 Test Mac notification
               </button>
@@ -633,7 +633,7 @@ export default function Settings() {
               {AI_RESPONSE_FLAVORS.map((flavor) => (
                 <div
                   key={flavor.id}
-                  className={`rounded-xl border p-4 text-left transition ${
+                  className={`cursor-pointer rounded-xl border p-4 text-left transition ${
                     aiResponseFlavor === flavor.id
                       ? "border-orange-400/45 bg-orange-400/10"
                       : "border-stone-700/60 bg-stone-950/35"
@@ -693,7 +693,7 @@ export default function Settings() {
                         );
                     }}
                     disabled={!mounted || !customAiInstructions.trim()}
-                    className="inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
+                    className="inline-flex cursor-pointer items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
                   >
                     Clear
                   </button>
@@ -701,7 +701,7 @@ export default function Settings() {
                     type="button"
                     onClick={() => void persistCustomAiInstructions()}
                     disabled={!mounted}
-                    className="inline-flex items-center justify-center rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex cursor-pointer items-center justify-center rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Save instructions
                   </button>
@@ -721,7 +721,7 @@ export default function Settings() {
               <button
                 type="button"
                 onClick={clearSavedPreferences}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm font-bold text-red-200 transition outline-none hover:bg-red-950/50 focus-visible:ring-2 focus-visible:ring-red-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm font-bold text-red-200 transition outline-none hover:bg-red-950/50 focus-visible:ring-2 focus-visible:ring-red-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950"
               >
                 <FontAwesomeIcon icon={faTrashCan} className="text-base" />
                 Clear saved preferences
@@ -730,7 +730,7 @@ export default function Settings() {
                 type="button"
                 onClick={() => void clearSavedStudyData()}
                 disabled={isClearingStudyData}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm font-bold text-red-200 transition outline-none hover:bg-red-950/50 focus-visible:ring-2 focus-visible:ring-red-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm font-bold text-red-200 transition outline-none hover:bg-red-950/50 focus-visible:ring-2 focus-visible:ring-red-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FontAwesomeIcon icon={faTrashCan} className="text-base" />
                 {isClearingStudyData
@@ -790,7 +790,7 @@ export default function Settings() {
                           type="button"
                           onClick={() => void loadOllamaModels(ollamaBaseUrl)}
                           disabled={isLoadingOllamaModels}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-stone-600 px-3 py-1 text-xs font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-600 px-3 py-1 text-xs font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <FontAwesomeIcon
                             icon={faArrowsRotate}
@@ -806,7 +806,7 @@ export default function Settings() {
                           id="ollama-model"
                           value={ollamaModel}
                           onChange={(e) => setOllamaModel(e.target.value)}
-                          className="mt-2 h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                          className="mt-2 h-11 w-full cursor-pointer rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
                         >
                           {ollamaModel &&
                           !ollamaModels.some(
@@ -869,7 +869,7 @@ export default function Settings() {
                       <button
                         type="button"
                         onClick={resetOllamaOptions}
-                        className="inline-flex shrink-0 items-center justify-center rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-200 transition hover:bg-stone-800"
+                        className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-200 transition hover:bg-stone-800"
                       >
                         Reset defaults
                       </button>
@@ -917,7 +917,7 @@ export default function Settings() {
                                 onChange={(e) =>
                                   updateOllamaOption(field.id, e.target.value)
                                 }
-                                className="mt-3 h-2 w-full accent-orange-400"
+                                className="mt-3 h-2 w-full cursor-pointer accent-orange-400"
                                 aria-label={`${field.label} slider`}
                               />
                             ) : null}
@@ -937,7 +937,7 @@ export default function Settings() {
                     <button
                       type="button"
                       onClick={() => void saveOllamaSettings()}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300"
+                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-orange-300"
                     >
                       <FontAwesomeIcon
                         icon={faFloppyDisk}
@@ -948,7 +948,7 @@ export default function Settings() {
                     <button
                       type="button"
                       onClick={() => void testOllamaSettings()}
-                      className="inline-flex items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
+                      className="inline-flex cursor-pointer items-center justify-center rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800"
                     >
                       Test
                     </button>

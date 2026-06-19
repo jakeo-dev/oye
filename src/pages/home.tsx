@@ -65,7 +65,7 @@ function NavCard({
   return (
     <Link
       href={href}
-      className="group relative flex gap-5 rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-orange-400/0 transition outline-none hover:border-orange-400/35 hover:bg-stone-900/70 hover:shadow-orange-950/20 focus-visible:ring-2 focus-visible:ring-orange-400/80 md:p-6"
+      className="group relative flex cursor-pointer gap-5 rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg shadow-black/20 ring-orange-400/0 transition outline-none hover:border-orange-400/35 hover:bg-stone-900/70 hover:shadow-orange-950/20 focus-visible:ring-2 focus-visible:ring-orange-400/80 md:p-6"
     >
       <div
         className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-orange-400/15 text-orange-400 transition group-hover:bg-orange-400/25 group-hover:text-orange-300"

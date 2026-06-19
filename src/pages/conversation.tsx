@@ -201,7 +201,7 @@ export default function Conversation() {
             <button
               type="button"
               onClick={() => toggleSpeakPrompt()}
-              className={`shrink-0 flex h-11 w-11 items-center justify-center rounded-full border bg-stone-800/80 outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
+              className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border bg-stone-800/80 outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
                 isSpeakingPrompt
                   ? "border-orange-400/50 text-orange-200 hover:border-orange-300/60 hover:bg-orange-400/15"
                   : "border-stone-600/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
@@ -227,7 +227,7 @@ export default function Conversation() {
               }}
               disabled={messages.length === 0 || isAwaitingReply}
               aria-label="Clear conversation"
-              className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-sm font-bold text-stone-100 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-sm font-bold text-stone-100 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:border-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent"
             >
               <FontAwesomeIcon icon={faTrash} aria-hidden="true" />
               Clear
@@ -266,7 +266,7 @@ export default function Conversation() {
               type="button"
               onClick={toggleListening}
               disabled={isAwaitingReply}
-              className={`flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:self-auto ${
+              className={`flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center self-end rounded-full border font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:self-auto ${
                 isListening
                   ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
                   : "border-stone-600/80 bg-stone-800/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
@@ -294,7 +294,7 @@ export default function Conversation() {
                 void sendMessage();
               }}
               disabled={isAwaitingReply}
-              className="h-12 shrink-0 rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-8"
+              className="h-12 shrink-0 cursor-pointer rounded-full bg-orange-400 px-6 text-base font-bold text-stone-950 shadow-lg shadow-orange-500/15 outline-none transition hover:bg-orange-300 focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-8"
             >
               Send
             </button>
