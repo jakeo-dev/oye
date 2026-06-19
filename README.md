@@ -16,20 +16,13 @@ uses it to install Git, Node.js, and Ollama as needed. macOS may ask for your
 admin password during installation.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jakeo-dev/alicante-app/main/scripts/setup-mac-homebrew.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jakeo-dev/oye/main/scripts/setup-mac-homebrew.sh | bash
 ```
 
 From an already cloned repo:
 
 ```bash
 ./scripts/setup-mac-homebrew.sh
-```
-
-For a feature branch, set `OYE_BRANCH` and use the same branch name in the raw
-script URL:
-
-```bash
-OYE_BRANCH=improve-tts curl -fsSL https://raw.githubusercontent.com/jakeo-dev/alicante-app/improve-tts/scripts/setup-mac-homebrew.sh | bash
 ```
 
 ### Option 2: Without Homebrew
@@ -39,7 +32,7 @@ Node.js, npm, and Ollama. If something is missing, it opens the official
 installer page and tells you to rerun the script after installation.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jakeo-dev/alicante-app/main/scripts/setup-mac-manual.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jakeo-dev/oye/main/scripts/setup-mac-manual.sh | bash
 ```
 
 From an already cloned repo:

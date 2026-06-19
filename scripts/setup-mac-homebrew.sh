@@ -2,7 +2,6 @@
 set -euo pipefail
 
 REPO_URL="${OYE_REPO_URL:-https://github.com/jakeo-dev/oye.git}"
-BRANCH="${OYE_BRANCH:-main}"
 APP_DIR="${OYE_APP_DIR:-$HOME/oye}"
 MODEL="${OLLAMA_MODEL:-llama3.2}"
 PIPER_VOICE="${PIPER_VOICE:-es_ES-carlfm-x_low}"
@@ -14,21 +13,6 @@ command_exists() {
 
 is_oye_repo() {
   [ -f "package.json" ] && node -e "process.exit(require('./package.json').name === 'oye' ? 0 : 1)" >/dev/null 2>&1
-}
-
-checkout_branch() {
-  if git remote | grep -qx origin; then
-    git remote set-url origin "$REPO_URL"
-  else
-    git remote add origin "$REPO_URL"
-  fi
-  git fetch origin "$BRANCH"
-  if git rev-parse --verify --quiet "$BRANCH" >/dev/null; then
-    git checkout "$BRANCH"
-  else
-    git checkout -b "$BRANCH" "origin/$BRANCH"
-  fi
-  git pull --ff-only origin "$BRANCH"
 }
 
 ensure_homebrew() {
@@ -88,18 +72,16 @@ ensure_piper() {
 
 checkout_repo() {
   if is_oye_repo; then
-    checkout_branch
     return
   fi
 
   if [ -d "$APP_DIR/.git" ]; then
     cd "$APP_DIR"
-    checkout_branch
     return
   fi
 
-  echo "Cloning ¡Oye! branch $BRANCH into $APP_DIR..."
-  git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+  echo "Cloning ¡Oye! into $APP_DIR..."
+  git clone "$REPO_URL" "$APP_DIR"
   cd "$APP_DIR"
 }
 
