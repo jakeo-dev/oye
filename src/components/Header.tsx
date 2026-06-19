@@ -21,42 +21,6 @@ type AppHeaderProps = {
   showProgressBar?: boolean;
 };
 
-type OllamaConnectionStatus =
-  | "checking"
-  | "online"
-  | "missing-model"
-  | "offline";
-
-type OllamaStatusResponse = {
-  status?: OllamaConnectionStatus;
-  label?: string;
-  detail?: string;
-  baseUrl?: string;
-  model?: string;
-};
-
-const ollamaStatusStyles: Record<
-  OllamaConnectionStatus,
-  { bubble: string; dot: string }
-> = {
-  checking: {
-    bubble: "border-stone-600/80 bg-stone-900/80 text-stone-300",
-    dot: "bg-stone-400",
-  },
-  online: {
-    bubble: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
-    dot: "bg-emerald-400",
-  },
-  "missing-model": {
-    bubble: "border-amber-300/35 bg-amber-300/10 text-amber-100",
-    dot: "bg-amber-300",
-  },
-  offline: {
-    bubble: "border-red-400/35 bg-red-500/10 text-red-100",
-    dot: "bg-red-400",
-  },
-};
-
 function IconButton({
   href,
   label,
@@ -95,66 +59,10 @@ function ExternalIconButton({
   );
 }
 
-function OllamaStatusBadge({
-  status,
-}: {
-  status: Required<Pick<OllamaStatusResponse, "status" | "label" | "detail">>;
-}) {
-  const statusStyles = ollamaStatusStyles[status.status];
-
-  return (
-    <span
-      className={`inline-flex max-w-36 items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-[0.6875rem] leading-none font-bold sm:max-w-44 ${statusStyles.bubble}`}
-      role="status"
-      aria-live="polite"
-      title={status.detail}
-    >
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${statusStyles.dot}`}
-        aria-hidden
-      />
-      <span className="truncate">{status.label}</span>
-    </span>
-  );
-}
-
 export default function Header({ showProgressBar = false }: AppHeaderProps) {
   const router = useRouter();
   const [progressFraction, setProgressFraction] = useState(0);
   const [progressLabel, setProgressLabel] = useState("Daily progress");
-  const [ollamaStatus, setOllamaStatus] = useState<
-    Required<Pick<OllamaStatusResponse, "status" | "label" | "detail">>
-  >({
-    status: "checking",
-    label: "Checking Ollama",
-    detail: "Checking configured Ollama connection.",
-  });
-
-  const loadOllamaStatus = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const response = await fetch("/api/settings/ollama/status", { signal });
-      const data = (await response.json()) as OllamaStatusResponse;
-
-      if (!response.ok) {
-        throw new Error(data.detail ?? "Could not check Ollama.");
-      }
-
-      setOllamaStatus({
-        status: data.status ?? "offline",
-        label: data.label ?? "Ollama offline",
-        detail: data.detail ?? "Could not check Ollama.",
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      setOllamaStatus({
-        status: "offline",
-        label: "Ollama offline",
-        detail: "Could not check Ollama.",
-      });
-    }
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,28 +107,6 @@ export default function Header({ showProgressBar = false }: AppHeaderProps) {
     };
   }, [router.asPath]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => {
-      void loadOllamaStatus(controller.signal);
-    }, 0);
-    const intervalId = window.setInterval(() => {
-      void loadOllamaStatus();
-    }, 45000);
-
-    function onSettingsUpdated() {
-      void loadOllamaStatus();
-    }
-
-    window.addEventListener("oye:settings-updated", onSettingsUpdated);
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-      window.clearInterval(intervalId);
-      window.removeEventListener("oye:settings-updated", onSettingsUpdated);
-    };
-  }, [loadOllamaStatus]);
-
   const githubHref =
     process.env.NEXT_PUBLIC_GITHUB_URL?.trim() ||
     "https://github.com/jakeo-dev/oye";
@@ -258,8 +144,6 @@ export default function Header({ showProgressBar = false }: AppHeaderProps) {
         )}
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          <OllamaStatusBadge status={ollamaStatus} />
-
           {router.pathname === "/home" && (
             <ExternalIconButton href={githubHref} label="Project on GitHub">
               <FontAwesomeIcon

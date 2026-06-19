@@ -9,10 +9,47 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import { Host_Grotesk } from "next/font/google";
+import { useCallback, useEffect, useState } from "react";
 const hostGrotesk = Host_Grotesk({
   variable: "--font-host-grotesk",
   subsets: ["latin"],
 });
+
+type OllamaConnectionStatus =
+  | "checking"
+  | "online"
+  | "missing-model"
+  | "offline";
+
+type OllamaStatusResponse = {
+  status?: OllamaConnectionStatus;
+  label?: string;
+  detail?: string;
+  baseUrl?: string;
+  model?: string;
+};
+
+const ollamaStatusStyles: Record<
+  OllamaConnectionStatus,
+  { bubble: string; dot: string }
+> = {
+  checking: {
+    bubble: "border-stone-600/80 bg-stone-900/80 text-stone-300",
+    dot: "bg-stone-400",
+  },
+  online: {
+    bubble: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+    dot: "bg-emerald-400",
+  },
+  "missing-model": {
+    bubble: "border-amber-300/35 bg-amber-300/10 text-amber-100",
+    dot: "bg-amber-300",
+  },
+  offline: {
+    bubble: "border-red-400/35 bg-red-500/10 text-red-100",
+    dot: "bg-red-400",
+  },
+};
 
 function NavCard({
   href,
@@ -59,6 +96,62 @@ function NavCard({
 }
 
 export default function Home() {
+  const [ollamaStatus, setOllamaStatus] = useState<
+    Required<Pick<OllamaStatusResponse, "status" | "label" | "detail">>
+  >({
+    status: "checking",
+    label: "Checking Ollama",
+    detail: "Checking configured Ollama connection.",
+  });
+
+  const loadOllamaStatus = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch("/api/settings/ollama/status", { signal });
+      const data = (await response.json()) as OllamaStatusResponse;
+
+      if (!response.ok) {
+        throw new Error(data.detail ?? "Could not check Ollama.");
+      }
+
+      setOllamaStatus({
+        status: data.status ?? "offline",
+        label: data.label ?? "Ollama offline",
+        detail: data.detail ?? "Could not check Ollama.",
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      setOllamaStatus({
+        status: "offline",
+        label: "Ollama offline",
+        detail: "Could not check Ollama.",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void loadOllamaStatus(controller.signal);
+    }, 0);
+    const intervalId = window.setInterval(() => {
+      void loadOllamaStatus();
+    }, 45000);
+
+    function onSettingsUpdated() {
+      void loadOllamaStatus();
+    }
+
+    window.addEventListener("oye:settings-updated", onSettingsUpdated);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+      window.removeEventListener("oye:settings-updated", onSettingsUpdated);
+    };
+  }, [loadOllamaStatus]);
+
   return (
     <div
       className={`${hostGrotesk.className} relative isolate min-h-[calc(100dvh-5.5rem)] overflow-hidden bg-stone-950 text-stone-100`}
@@ -78,11 +171,13 @@ export default function Home() {
 
       <div className="relative mx-auto flex w-full max-w-220 flex-col gap-12 px-8 py-12 lg:flex-row lg:items-center lg:gap-16">
         <div className="flex min-w-0 flex-1 flex-col gap-8 lg:max-w-xl">
-          <header className="space-y-3">
-            <h1 className="text-right text-4xl leading-[1.1] font-black tracking-tight text-pretty text-white sm:text-5xl">
+          <header className="flex flex-col items-center justify-center space-y-3 lg:items-end">
+            <OllamaStatusBadge status={ollamaStatus} />
+
+            <h1 className="text-center text-4xl leading-[1.1] font-black tracking-tight text-pretty text-white sm:text-5xl lg:text-right">
               Pick up where you left off
             </h1>
-            <p className="max-w-md text-right text-base leading-relaxed text-pretty text-stone-400 sm:text-lg">
+            <p className="text-center text-base leading-relaxed text-pretty text-stone-400 sm:text-lg lg:text-right">
               Continue with structured lessons built around practical Spanish.
             </p>
           </header>
@@ -125,5 +220,28 @@ export default function Home() {
         </div>
       </div>
     </div>
+  );
+}
+
+function OllamaStatusBadge({
+  status,
+}: {
+  status: Required<Pick<OllamaStatusResponse, "status" | "label" | "detail">>;
+}) {
+  const statusStyles = ollamaStatusStyles[status.status];
+
+  return (
+    <span
+      className={`inline-flex max-w-36 items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-[0.6875rem] leading-none font-bold sm:max-w-44 ${statusStyles.bubble}`}
+      role="status"
+      aria-live="polite"
+      title={status.detail}
+    >
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${statusStyles.dot}`}
+        aria-hidden
+      />
+      <span className="truncate">{status.label}</span>
+    </span>
   );
 }
