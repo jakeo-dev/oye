@@ -383,7 +383,9 @@ export default function Settings() {
       await patchSettings({ customAiInstructions: trimmed });
       setCustomAiInstructions(trimmed);
       showToast(
-        trimmed ? "Custom AI instructions saved." : "Custom AI instructions cleared.",
+        trimmed
+          ? "Custom AI instructions saved."
+          : "Custom AI instructions cleared.",
       );
       playSound("tap");
     } catch {
@@ -432,10 +434,7 @@ export default function Settings() {
     }
   }
 
-  function updateOllamaOption(
-    id: OllamaGenerationOptionId,
-    rawValue: string,
-  ) {
+  function updateOllamaOption(id: OllamaGenerationOptionId, rawValue: string) {
     setOllamaOptions((current) =>
       normalizeOllamaGenerationOptions({
         ...current,
@@ -599,24 +598,6 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
-              <label className="sr-only" htmlFor="ai-response-flavor">
-                AI response style
-              </label>
-              <select
-                id="ai-response-flavor"
-                value={aiResponseFlavor}
-                onChange={(e) =>
-                  void persistAiResponseFlavor(e.target.value as AiResponseFlavor)
-                }
-                disabled={!mounted}
-                className="h-11 w-full rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 text-stone-100 transition outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50 sm:w-64"
-              >
-                {AI_RESPONSE_FLAVORS.map((flavor) => (
-                  <option key={flavor.id} value={flavor.id}>
-                    {flavor.label}
-                  </option>
-                ))}
-              </select>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {AI_RESPONSE_FLAVORS.map((flavor) => (
@@ -627,6 +608,9 @@ export default function Settings() {
                       ? "border-orange-400/45 bg-orange-400/10"
                       : "border-stone-700/60 bg-stone-950/35"
                   }`}
+                  onClick={() =>
+                    void persistAiResponseFlavor(flavor.id as AiResponseFlavor)
+                  }
                 >
                   <p className="text-sm font-bold text-stone-100">
                     {flavor.label}
@@ -656,7 +640,7 @@ export default function Settings() {
                 disabled={!mounted}
                 rows={4}
                 maxLength={1000}
-                className="mt-3 min-h-28 w-full resize-y rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 py-3 text-stone-100 placeholder:text-stone-500 outline-none transition focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50"
+                className="mt-3 min-h-28 w-full resize-y rounded-xl border border-stone-600/80 bg-stone-900/60 px-4 py-3 text-stone-100 transition outline-none placeholder:text-stone-500 focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30 disabled:opacity-50"
                 placeholder="Example: Keep answers extra short, use Spain Spanish, and include pronunciation tips."
               />
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -671,7 +655,9 @@ export default function Settings() {
                       void patchSettings({
                         customAiInstructions: DEFAULT_CUSTOM_AI_INSTRUCTIONS,
                       })
-                        .then(() => showToast("Custom AI instructions cleared."))
+                        .then(() =>
+                          showToast("Custom AI instructions cleared."),
+                        )
                         .catch(() =>
                           showToast("Could not clear custom AI instructions."),
                         );
@@ -873,10 +859,7 @@ export default function Settings() {
                                 max={field.max}
                                 step={field.step}
                                 onChange={(e) =>
-                                  updateOllamaOption(
-                                    field.id,
-                                    e.target.value,
-                                  )
+                                  updateOllamaOption(field.id, e.target.value)
                                 }
                                 className="h-9 w-24 shrink-0 rounded-lg border border-stone-600/80 bg-stone-950/70 px-3 text-right font-mono text-sm text-stone-100 outline-none focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
                                 aria-describedby={`${fieldId}-desc`}
@@ -890,10 +873,7 @@ export default function Settings() {
                                 max={field.max}
                                 step={field.step}
                                 onChange={(e) =>
-                                  updateOllamaOption(
-                                    field.id,
-                                    e.target.value,
-                                  )
+                                  updateOllamaOption(field.id, e.target.value)
                                 }
                                 className="mt-3 h-2 w-full accent-orange-400"
                                 aria-label={`${field.label} slider`}

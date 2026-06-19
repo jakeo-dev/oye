@@ -212,9 +212,9 @@ export default function Home() {
               src="/oye-tura-the-criatura-hat1.png"
               width={500}
               height={600}
-              alt="Spanish learning app mascot"
+              alt="Tura the Criatura"
               priority
-              className="mx-auto h-auto w-full max-w-80 object-contain drop-shadow-2xl drop-shadow-orange-300/30 sm:max-w-[380px]"
+              className="mx-auto h-auto w-full max-w-80 object-contain drop-shadow-2xl drop-shadow-orange-300/30 sm:max-w-95"
             />
           </div>
         </div>
