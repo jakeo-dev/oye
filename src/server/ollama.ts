@@ -410,8 +410,8 @@ function createFallbackLesson(input: LessonGenerationInput): Lesson {
       ? `${curriculumSection.focus} Practice this through the selected scenario.`
       : "Polite cafe ordering and simple follow-up questions.",
     spanishPrompt: curriculumSection
-      ? "El cafe es pequeno, pero la mesa es grande."
-      : "Hola, quiero un cafe con leche, por favor.",
+      ? "El café es pequeño, pero la mesa es grande."
+      : "Hola, quiero un café con leche, por favor.",
     englishTranslation: curriculumSection
       ? "The coffee is small, but the table is big."
       : "Hello, I want a coffee with milk, please.",

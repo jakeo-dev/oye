@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import { resolveLessonSteps } from "@/lib/lessonSteps";
+import { buildLessonExercises } from "@/lib/lessonExercises";
 import {
   getLesson,
   listPracticeAttempts,
@@ -10,7 +10,7 @@ import type { PracticeAttempt } from "@/server/types";
 
 function getId(req: NextApiRequest): string {
   const id = req.query.id;
-  return Array.isArray(id) ? id[0] : id ?? "";
+  return Array.isArray(id) ? id[0] : (id ?? "");
 }
 
 function normalizeForScore(text: string): string[] {
@@ -94,16 +94,13 @@ export default async function handler(
       return;
     }
 
-    const steps = resolveLessonSteps(lesson);
+    const steps = buildLessonExercises(lesson);
     const stepIndex = Math.max(
       0,
       Math.min(steps.length - 1, body.stepIndex ?? 0),
     );
     const step = steps[stepIndex];
-    const prompt =
-      step?.spanish?.trim() ||
-      step?.words?.map((word) => word.spanish).join(" ") ||
-      lesson.spanishPrompt;
+    const prompt = step?.targetText || lesson.spanishPrompt;
     const result = scoreTranscript(transcript, prompt);
     const attempt: PracticeAttempt = {
       id: `practice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
