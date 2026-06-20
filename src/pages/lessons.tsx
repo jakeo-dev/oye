@@ -40,7 +40,7 @@ const hostGrotesk = Host_Grotesk({
 });
 
 const IS_DEV = process.env.NODE_ENV !== "production";
-const LESSON_TIMEOUT_MS = 40000;
+const LESSON_TIMEOUT_MS = 130000;
 
 type FlowPhase = "pick-context" | "custom-details" | "lesson";
 type PresetStatus = {
@@ -153,7 +153,11 @@ function speechTextForStep(step: LessonStep, lesson: Lesson): string {
   if (phrase) {
     return phrase;
   }
-  if (step.kind === "vocabulary" || step.kind === "phrases" || step.kind === "swap") {
+  if (
+    step.kind === "vocabulary" ||
+    step.kind === "phrases" ||
+    step.kind === "swap"
+  ) {
     const words = step.words?.length ? step.words : lesson.vocabulary;
     if (words.length > 0) {
       return words.map((w) => w.spanish).join(". ");
@@ -551,8 +555,8 @@ export default function Lessons() {
               </h1>
               <p className="mx-auto mt-3 max-w-2xl text-pretty text-stone-400">
                 Choose where you will use Spanish. The app builds a task-based
-                lesson with useful phrases, swaps, a mini scenario, and
-                practice using the same AI as the generate button.
+                lesson with useful phrases, swaps, a mini scenario, and practice
+                using the same AI as the generate button.
               </p>
               {currentCurriculumSection ? (
                 <div className="mt-5 rounded-xl border border-orange-400/25 bg-orange-400/10 p-4 text-left">
@@ -663,7 +667,7 @@ export default function Lessons() {
                       <span className="mt-1 text-sm text-stone-400">
                         {ctx.description}
                       </span>
-                      <span className="absolute bottom-5 sm:bottom-6 left-5 sm:left-6 text-xs font-semibold text-orange-400/90 uppercase">
+                      <span className="absolute bottom-5 left-5 text-xs font-semibold text-orange-400/90 uppercase sm:bottom-6 sm:left-6">
                         {ctx.scenario === null
                           ? "Create scenario →"
                           : "Load lesson →"}
@@ -722,8 +726,8 @@ export default function Lessons() {
               Custom scenario
             </h2>
             <p className="mt-2 text-sm text-stone-500">
-              Describe the situation in English. The model turns it into
-              useful phrases, word swaps, a mini scenario, and practice.
+              Describe the situation in English. The model turns it into useful
+              phrases, word swaps, a mini scenario, and practice.
             </p>
             <div className="mt-4 flex flex-col gap-3">
               <textarea
@@ -841,7 +845,7 @@ export default function Lessons() {
                   {currentStep.spanish || currentStep.english ? (
                     <div className="mt-5 flex flex-col gap-2 rounded-xl border border-stone-700/60 bg-stone-950/40 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                       {currentStep.spanish ? (
-                        <p className="text-lg font-bold text-orange-100">
+                        <p className="text-left text-lg font-bold text-orange-100">
                           {currentStep.spanish}
                         </p>
                       ) : null}

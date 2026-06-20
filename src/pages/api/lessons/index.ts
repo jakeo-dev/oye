@@ -20,6 +20,10 @@ type ErrorResponse = {
   error: string;
 };
 
+export const config = {
+  maxDuration: 130,
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -79,15 +83,6 @@ export default async function handler(
             ollamaOptions: body.ollamaOptions ?? settings.ollamaOptions,
             aiResponseFlavor: settings.aiResponseFlavor,
             customAiInstructions: settings.customAiInstructions,
-          }).catch((error) => {
-            const fallbackLesson = generateFallbackLesson(generationInput);
-            return {
-              ...fallbackLesson,
-              touristFocus:
-                error instanceof Error
-                  ? `Generated offline fallback because Ollama failed: ${error.message}`
-                  : fallbackLesson.touristFocus,
-            };
           });
 
       if (generationInput.scenarioPresetId && lesson.source === "ollama") {
@@ -109,7 +104,7 @@ export default async function handler(
         cacheHit: false,
         warning:
           lesson.source === "fallback"
-            ? "Ollama did not respond in time, so a fallback lesson was generated."
+            ? "Generated the built-in offline fallback lesson."
             : undefined,
       });
     } catch (error) {

@@ -24,6 +24,7 @@ type OllamaGenerationOptionField = {
   step: number;
   valueType: "float" | "int";
   control: "slider" | "input";
+  supportedByGenerateApi?: boolean;
 };
 
 export const DEFAULT_OLLAMA_GENERATION_OPTIONS: OllamaGenerationOptions = {
@@ -124,6 +125,7 @@ export const OLLAMA_GENERATION_OPTION_FIELDS: OllamaGenerationOptionField[] = [
     step: 0.05,
     valueType: "float",
     control: "slider",
+    supportedByGenerateApi: false,
   },
   {
     id: "presencePenalty",
@@ -136,6 +138,7 @@ export const OLLAMA_GENERATION_OPTION_FIELDS: OllamaGenerationOptionField[] = [
     step: 0.05,
     valueType: "float",
     control: "slider",
+    supportedByGenerateApi: false,
   },
   {
     id: "numCtx",
@@ -218,6 +221,9 @@ export function toOllamaApiOptions(
 ): Record<string, number> {
   return OLLAMA_GENERATION_OPTION_FIELDS.reduce<Record<string, number>>(
     (payload, field) => {
+      if (field.supportedByGenerateApi === false) {
+        return payload;
+      }
       payload[field.apiKey] = options[field.id];
       return payload;
     },

@@ -78,6 +78,7 @@ export type OllamaModelSummary = {
 
 const defaultBaseUrl = "http://127.0.0.1:11434";
 const defaultModel = "llama3.2";
+const lessonGenerationTimeoutMs = 120000;
 
 export function getOllamaConfig(options: OllamaOptions | AppSettings = {}) {
   const settings = "ollamaBaseUrl" in options ? options : null;
@@ -132,6 +133,11 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function stringOrDefault(value: unknown, fallback: string): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || fallback;
 }
 
 function parseVocabularyArray(value: unknown): VocabularyItem[] {
@@ -518,7 +524,7 @@ export async function generateLessonWithOllama(
       format: "json",
       options: getGenerateOptionsPayload(options, 1200),
     },
-    35000,
+    lessonGenerationTimeoutMs,
   );
 
   if (!response.ok) {
@@ -527,13 +533,21 @@ export async function generateLessonWithOllama(
 
   const data = (await response.json()) as OllamaGenerateResponse;
   const generated = parseJsonObject(data.response ?? "");
+  const fallbackLesson = createFallbackLesson(input);
   const vocabulary = parseVocabularyArray(generated.vocabulary);
-  const title = String(generated.title ?? "Spanish Tourist Lesson");
-  const touristFocus = String(
-    generated.touristFocus ?? "Tourist Spanish basics.",
+  const title = stringOrDefault(generated.title, fallbackLesson.title);
+  const touristFocus = stringOrDefault(
+    generated.touristFocus,
+    fallbackLesson.touristFocus,
   );
-  const spanishPrompt = String(generated.spanishPrompt ?? "");
-  const englishTranslation = String(generated.englishTranslation ?? "");
+  const spanishPrompt = stringOrDefault(
+    generated.spanishPrompt,
+    fallbackLesson.spanishPrompt,
+  );
+  const englishTranslation = stringOrDefault(
+    generated.englishTranslation,
+    fallbackLesson.englishTranslation,
+  );
   const practiceQuestions = asStringArray(generated.practiceQuestions);
 
   let steps = parseLessonStepsRaw(generated.steps);
@@ -560,21 +574,26 @@ export async function generateLessonWithOllama(
       mergedVocabulary = fromStep;
     }
   }
+  if (mergedVocabulary.length === 0) {
+    mergedVocabulary = fallbackLesson.vocabulary;
+  }
 
   return {
-    ...createFallbackLesson(input),
+    ...fallbackLesson,
     scenarioPresetId: input.scenarioPresetId,
     curriculumSectionId: curriculumSection?.id,
     curriculumSectionTitle: curriculumSection?.title,
     curriculumPartTitle: curriculumSection?.partTitle,
     title,
     level,
-    scenario: String(generated.scenario ?? scenario),
+    scenario: stringOrDefault(generated.scenario, scenario),
     touristFocus,
     spanishPrompt,
     englishTranslation,
     vocabulary: mergedVocabulary,
-    practiceQuestions,
+    practiceQuestions: practiceQuestions.length
+      ? practiceQuestions
+      : fallbackLesson.practiceQuestions,
     steps,
     source: "ollama",
   };
