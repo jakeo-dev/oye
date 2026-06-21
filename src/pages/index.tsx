@@ -135,7 +135,7 @@ export default function Home() {
             <div className="animate-wiggle relative p-6">
               <div className="pointer-events-none absolute inset-x-8 top-0 h-px" />
               <Image
-                src="/oye-tura-the-criatura.png"
+                src="/tura-the-criatura.png"
                 width={360}
                 height={420}
                 alt="Tura the Criatura"
