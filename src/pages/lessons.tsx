@@ -930,6 +930,12 @@ export default function Lessons() {
                           setStepSpeechText(e.target.value);
                           setLastPracticeAttempt(null);
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void saveStepPractice();
+                          }
+                        }}
                         className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-2.5 text-stone-100 transition outline-none placeholder:text-stone-500 focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
                         placeholder="What you said appears here…"
                         aria-label="Transcript of your Spanish practice"
