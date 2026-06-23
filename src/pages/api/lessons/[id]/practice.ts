@@ -1,16 +1,19 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import { resolveLessonSteps } from "@/lib/lessonSteps";
 import {
   getLesson,
   listPracticeAttempts,
   savePracticeAttempt,
 } from "@/server/database";
 import type { PracticeAttempt } from "@/server/types";
+import {
+  practicePromptsForStep,
+  resolveLessonSteps,
+} from "../../../../lib/lessonSteps";
 
 function getId(req: NextApiRequest): string {
   const id = req.query.id;
-  return Array.isArray(id) ? id[0] : id ?? "";
+  return Array.isArray(id) ? id[0] : (id ?? "");
 }
 
 function normalizeForScore(text: string): string[] {
@@ -46,7 +49,7 @@ function scoreTranscript(transcript: string, prompt: string) {
   if (score >= 80) {
     return {
       score,
-      feedback: "Strong match. Nice work with the key phrase.",
+      feedback: "Nice work! You got most of the key words right.",
       missedWords,
     };
   }
@@ -59,9 +62,24 @@ function scoreTranscript(transcript: string, prompt: string) {
   }
   return {
     score,
-    feedback: "Saved. Listen once more, then repeat the full Spanish line.",
+    feedback:
+      "Try again. Listen once more, then repeat the entire line again in Spanish.",
     missedWords,
   };
+}
+
+function scoreTranscriptAgainstPrompts(transcript: string, prompts: string[]) {
+  const usablePrompts = prompts.filter((prompt) => prompt.trim());
+  const scored = (usablePrompts.length ? usablePrompts : [""]).map(
+    (prompt) => ({
+      prompt,
+      result: scoreTranscript(transcript, prompt),
+    }),
+  );
+
+  return scored.reduce((best, current) =>
+    current.result.score > best.result.score ? current : best,
+  );
 }
 
 export default async function handler(
@@ -100,11 +118,12 @@ export default async function handler(
       Math.min(steps.length - 1, body.stepIndex ?? 0),
     );
     const step = steps[stepIndex];
-    const prompt =
-      step?.spanish?.trim() ||
-      step?.words?.map((word) => word.spanish).join(" ") ||
-      lesson.spanishPrompt;
-    const result = scoreTranscript(transcript, prompt);
+    const scored = scoreTranscriptAgainstPrompts(
+      transcript,
+      practicePromptsForStep(step, lesson),
+    );
+    const prompt = scored.prompt || lesson.spanishPrompt;
+    const result = scored.result;
     const attempt: PracticeAttempt = {
       id: `practice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       lessonId,

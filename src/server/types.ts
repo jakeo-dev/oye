@@ -26,11 +26,20 @@ export type LessonStep = {
   kind: LessonStepKind;
   title: string;
   body: string;
+  /** Breakdown step: phrase pieces rendered as separate UI rows. */
+  parts?: VocabularyItem[];
   /** Vocabulary step: word list (may also mirror top-level lesson.vocabulary). */
   words?: VocabularyItem[];
   /** Grammar / phrase / practice: optional example line. */
   spanish?: string;
   english?: string;
+  /** Swap steps: the word or phrase in `spanish` that should be replaced. */
+  targetSpanish?: string;
+  targetEnglish?: string;
+  /** Practice accepts any of these complete Spanish phrases. */
+  acceptedSpanish?: string[];
+  /** Listen-only recall steps should play Spanish without showing it first. */
+  listenOnly?: boolean;
 };
 
 export type Lesson = {

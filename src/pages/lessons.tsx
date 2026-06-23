@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -28,10 +28,10 @@ import type {
 } from "@/server/types";
 import type { CurriculumSection } from "@/lib/curriculum";
 
-import { resolveLessonSteps } from "@/lib/lessonSteps";
 import { useSoundEffect } from "@/hooks/useSoundEffect";
 import { useSpanishDictation } from "@/hooks/useSpanishDictation";
 import { useSpanishPromptSpeech } from "@/hooks/useSpanishPromptSpeech";
+import { resolveLessonSteps } from "../lib/lessonSteps";
 
 import { Host_Grotesk } from "next/font/google";
 const hostGrotesk = Host_Grotesk({
@@ -121,31 +121,34 @@ const CONTEXT_PRESETS = [
 
 function stepKindLabel(kind: LessonStep["kind"]): string {
   switch (kind) {
-    case "goal":
-      return "Goal";
-    case "phrases":
-      return "Useful phrases";
     case "breakdown":
       return "Breakdown";
     case "swap":
-      return "Swap words";
-    case "scenario":
-      return "Mini scenario";
+      return "Swap";
     case "review":
-      return "Review";
-    case "overview":
-      return "Overview";
-    case "vocabulary":
-      return "Vocabulary";
-    case "grammar":
-      return "Grammar";
+      return "Listen only";
     case "phrase":
-      return "Phrase";
-    case "practice":
-      return "Practice";
+    case "phrases":
+      return "New phrase";
     default:
       return "Step";
   }
+}
+
+function stepPracticeLabel(step: LessonStep | null): string {
+  if (!step) {
+    return "Say or type the phrase.";
+  }
+  if (step.listenOnly) {
+    return "Listen, then say or type the original phrase from memory.";
+  }
+  if (step.kind === "swap") {
+    return "Say or type the full phrase with one replacement word.";
+  }
+  if (step.kind === "breakdown") {
+    return "Say or type the original phrase again.";
+  }
+  return "Say or type the phrase.";
 }
 
 function speechTextForStep(step: LessonStep, lesson: Lesson): string {
@@ -164,6 +167,15 @@ function speechTextForStep(step: LessonStep, lesson: Lesson): string {
     }
   }
   return lesson.spanishPrompt.trim() || "Hola, ¿cómo estás?";
+}
+
+function speakButtonClasses(isActive: boolean, size: "md" | "lg" = "md") {
+  const dimensions = size === "lg" ? "h-12 w-12" : "h-10 w-10";
+  return `flex ${dimensions} shrink-0 cursor-pointer items-center justify-center rounded-full border transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
+    isActive
+      ? "border-orange-300/70 bg-orange-400/15 text-orange-100"
+      : "border-stone-600 bg-stone-800 text-orange-300 hover:border-orange-400/50 hover:bg-orange-400/10"
+  }`;
 }
 
 async function fetchWithTimeout(
@@ -194,10 +206,12 @@ export default function Lessons() {
   const [lastPracticeAttempt, setLastPracticeAttempt] =
     useState<PracticeAttempt | null>(null);
   const [isSavingPractice, setIsSavingPractice] = useState(false);
+  const [speakingWordText, setSpeakingWordText] = useState<string | null>(null);
   const [currentCurriculumSection, setCurrentCurriculumSection] =
     useState<CurriculumSection | null>(null);
   const [curriculumCompletedCount, setCurriculumCompletedCount] = useState(0);
   const [curriculumTotal, setCurriculumTotal] = useState(0);
+  const wordAudioRef = useRef<HTMLAudioElement | null>(null);
   const playSound = useSoundEffect();
 
   const steps = useMemo(
@@ -205,6 +219,8 @@ export default function Lessons() {
     [lesson],
   );
   const currentStep = steps[stepIndex] ?? null;
+  const hasPassingAttempt =
+    lastPracticeAttempt !== null && lastPracticeAttempt.score >= 50;
 
   const speechOverride = useMemo(() => {
     if (!lesson || !currentStep) {
@@ -231,6 +247,72 @@ export default function Lessons() {
       genericError: (code) => `Speech error: ${code}. Try again or type below.`,
     },
   });
+
+  const stopWordAudio = useCallback(() => {
+    const audio = wordAudioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    wordAudioRef.current = null;
+    setSpeakingWordText(null);
+  }, []);
+
+  function toggleSpeakWord(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || typeof window === "undefined") {
+      return;
+    }
+
+    if (wordAudioRef.current && speakingWordText === trimmed) {
+      stopWordAudio();
+      return;
+    }
+
+    stopWordAudio();
+    const params = new URLSearchParams({ text: trimmed });
+    const audio = new Audio(`/api/tts?${params.toString()}`);
+    audio.preload = "auto";
+    wordAudioRef.current = audio;
+    setSpeakingWordText(trimmed);
+
+    audio.onended = () => {
+      if (wordAudioRef.current === audio) {
+        wordAudioRef.current = null;
+        setSpeakingWordText(null);
+      }
+    };
+    audio.onerror = () => {
+      if (wordAudioRef.current === audio) {
+        wordAudioRef.current = null;
+      }
+      setSpeakingWordText(null);
+      setStatus("Could not play that word aloud.");
+    };
+
+    void audio.play().catch(() => {
+      if (wordAudioRef.current !== audio) {
+        return;
+      }
+      wordAudioRef.current = null;
+      setSpeakingWordText(null);
+      setStatus("Could not start audio playback.");
+    });
+  }
+
+  function toggleSpeakStepPhrase() {
+    stopWordAudio();
+    toggleSpeakPrompt();
+  }
+
+  useEffect(() => {
+    return () => stopWordAudio();
+  }, [stopWordAudio]);
 
   useEffect(() => {
     async function peekLatestLesson() {
@@ -261,6 +343,7 @@ export default function Lessons() {
 
   function resetStepPractice() {
     stopListening();
+    stopWordAudio();
     setStepSpeechText("");
     setPracticeHint("");
     setLastPracticeAttempt(null);
@@ -463,6 +546,22 @@ export default function Lessons() {
     setStepSpeechText("");
     setPracticeHint("");
     stopListening();
+    stopWordAudio();
+  }
+
+  function goToNextStep() {
+    if (!hasPassingAttempt) {
+      setPracticeHint("Check a full Spanish answer before continuing.");
+      return;
+    }
+
+    if (isLastStep) {
+      void finishLesson();
+      return;
+    }
+
+    resetStepPractice();
+    setStepIndex((i) => Math.min(steps.length - 1, i + 1));
   }
 
   async function refreshCurriculum() {
@@ -530,15 +629,6 @@ export default function Lessons() {
     <div
       className={`${hostGrotesk.className} relative isolate min-h-[calc(100dvh-5.5rem)] overflow-hidden bg-stone-950 text-stone-100`}
     >
-      <div
-        className="pointer-events-none absolute -top-24 right-0 h-72 w-72 rounded-full bg-orange-500/15 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute top-1/3 -left-20 h-64 w-64 rounded-full bg-amber-500/8 blur-3xl"
-        aria-hidden
-      />
-
       <div className="relative mx-auto flex w-full max-w-220 flex-col gap-6 px-8 py-12">
         {phase === "pick-context" ? (
           <>
@@ -554,9 +644,9 @@ export default function Lessons() {
                 Pick a real-life context
               </h1>
               <p className="mx-auto mt-3 max-w-2xl text-pretty text-stone-400">
-                Choose where you will use Spanish. The app builds a task-based
-                lesson with useful phrases, swaps, a mini scenario, and practice
-                using the same AI as the generate button.
+                Choose where you will use Spanish. Each lesson follows five
+                focused steps: hear a phrase, break it down, make two swaps,
+                then recall it by ear.
               </p>
               {currentCurriculumSection ? (
                 <div className="mt-5 rounded-xl border border-orange-400/25 bg-orange-400/10 p-4 text-left">
@@ -727,7 +817,7 @@ export default function Lessons() {
             </h2>
             <p className="mt-2 text-sm text-stone-500">
               Describe the situation in English. The model turns it into useful
-              phrases, word swaps, a mini scenario, and practice.
+              phrase practice for the current grammar section.
             </p>
             <div className="mt-4 flex flex-col gap-3">
               <textarea
@@ -774,118 +864,94 @@ export default function Lessons() {
         ) : null}
 
         {phase === "lesson" && lesson ? (
-          <>
-            <section className="relative overflow-hidden rounded-2xl border border-stone-700/80 bg-stone-900/50 p-5 shadow-lg ring-1 shadow-black/25 ring-white/5 backdrop-blur-sm sm:p-7">
+          <section className="rounded-xl border border-stone-700/80 bg-stone-900/70 p-5 shadow-lg shadow-black/20 sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold tracking-[0.18em] text-orange-300 uppercase">
+                  {curriculumTotal > 0
+                    ? `Section ${Math.min(
+                        curriculumCompletedCount + 1,
+                        curriculumTotal,
+                      )} of ${curriculumTotal}`
+                    : "Section path"}
+                </p>
+                <h1 className="mt-2 text-2xl leading-tight font-black tracking-tight text-white sm:text-3xl">
+                  {lesson.curriculumSectionTitle ?? lesson.title}
+                </h1>
+                {lesson.curriculumPartTitle ? (
+                  <p className="mt-1 text-sm font-semibold text-stone-300">
+                    {lesson.curriculumPartTitle}
+                  </p>
+                ) : null}
+                <p className="mt-2 max-w-3xl text-sm text-stone-400">
+                  {lesson.scenario}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={newLessonFlow}
+                className="shrink-0 cursor-pointer rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-300 transition hover:bg-stone-800"
+              >
+                New context
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-stone-400">
+                <span>
+                  Step {stepIndex + 1} of {steps.length}
+                </span>
+                <span className="rounded-full border border-teal-400/30 bg-teal-400/10 px-2.5 py-1 font-semibold text-teal-100">
+                  {currentStep ? stepKindLabel(currentStep.kind) : "Step"}
+                </span>
+              </div>
               <div
-                className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-orange-400/40 to-transparent"
-                aria-hidden
-              />
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold tracking-[0.2em] text-orange-400/90 uppercase">
-                    {lesson.title}
-                  </p>
-                  {lesson.curriculumSectionTitle ? (
-                    <p className="mt-1 text-xs font-semibold text-orange-200/90">
-                      {lesson.curriculumPartTitle}:{" "}
-                      {lesson.curriculumSectionTitle}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-stone-500">
-                    Context: {lesson.scenario}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={newLessonFlow}
-                  className="shrink-0 cursor-pointer rounded-full border border-stone-600 px-4 py-2 text-xs font-bold text-stone-300 hover:bg-stone-800"
-                >
-                  New context
-                </button>
+                className="mt-3 grid h-2 grid-cols-5 gap-1"
+                role="progressbar"
+                aria-valuenow={stepIndex + 1}
+                aria-valuemin={1}
+                aria-valuemax={steps.length}
+              >
+                {steps.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-full rounded-full transition ${
+                      i <= stepIndex ? "bg-orange-400" : "bg-stone-700"
+                    }`}
+                  />
+                ))}
               </div>
+            </div>
 
-              <div className="mt-6">
-                <div className="flex flex-wrap items-center gap-3 text-xs text-stone-500">
-                  <span>
-                    Step {stepIndex + 1} of {steps.length}
-                  </span>
-                  <span className="rounded-full bg-stone-800/80 px-2 py-0.5 font-semibold text-orange-200/90">
-                    {currentStep ? stepKindLabel(currentStep.kind) : "Step"}
-                  </span>
+            {currentStep ? (
+              <div className="mt-7">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="text-xl font-black tracking-tight text-white sm:text-2xl">
+                      {currentStep.title}
+                    </h2>
+                    {currentStep.body ? (
+                      <p className="mt-3 max-w-3xl text-pretty whitespace-pre-line text-stone-300">
+                        {currentStep.body}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                <div
-                  className="mt-3 flex h-1.5 gap-1"
-                  role="progressbar"
-                  aria-valuenow={stepIndex + 1}
-                  aria-valuemin={1}
-                  aria-valuemax={steps.length}
-                >
-                  {steps.map((_, i) => (
-                    <span
-                      key={i}
-                      className={`h-full min-w-6 flex-1 rounded-full transition ${
-                        i <= stepIndex ? "bg-orange-400/70" : "bg-stone-700/80"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
 
-              {currentStep ? (
-                <div className="mt-6">
-                  <h2 className="text-xl font-black tracking-tight text-white sm:text-2xl">
-                    {currentStep.title}
-                  </h2>
-                  {currentStep.body ? (
-                    <p className="mt-3 leading-relaxed text-pretty whitespace-pre-line text-stone-300">
-                      {currentStep.body}
+                {currentStep.listenOnly ? (
+                  <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-teal-400/25 bg-teal-400/10 p-4">
+                    <p className="text-sm text-teal-50">
+                      Listen first. The Spanish line is hidden for this recall
+                      step.
                     </p>
-                  ) : null}
-
-                  {currentStep.spanish || currentStep.english ? (
-                    <div className="mt-5 flex flex-col gap-2 rounded-xl border border-stone-700/60 bg-stone-950/40 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                      {currentStep.spanish ? (
-                        <p className="text-left text-lg font-bold text-orange-100">
-                          {currentStep.spanish}
-                        </p>
-                      ) : null}
-                      {currentStep.english ? (
-                        <p className="text-sm text-stone-400 sm:text-right">
-                          {currentStep.english}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {currentStep.words && currentStep.words.length > 0 ? (
-                    <ul className="mt-5 divide-y divide-stone-700/80 rounded-xl border border-stone-700/60 bg-stone-950/40">
-                      {currentStep.words.map((item, itemIndex) => (
-                        <li
-                          key={`${item.spanish}-${item.english}-${itemIndex}`}
-                          className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3.5 sm:px-5"
-                        >
-                          <span className="font-bold text-orange-100">
-                            {item.spanish}
-                          </span>
-                          <span className="text-right text-stone-400">
-                            {item.english}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-
-                  <div className="mt-6 flex flex-wrap items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => toggleSpeakPrompt()}
-                      className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border bg-stone-800/80 transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900 ${
-                        isSpeakingPrompt
-                          ? "border-orange-400/50 text-orange-200 hover:border-orange-300/60 hover:bg-orange-400/15"
-                          : "border-stone-600/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
-                      }`}
+                      onClick={toggleSpeakStepPhrase}
+                      className={speakButtonClasses(isSpeakingPrompt, "lg")}
                       aria-label={
-                        isSpeakingPrompt ? "Stop reading aloud" : "Read aloud"
+                        isSpeakingPrompt
+                          ? "Stop reading hidden phrase aloud"
+                          : "Listen to hidden phrase"
                       }
                     >
                       <FontAwesomeIcon
@@ -893,129 +959,261 @@ export default function Lessons() {
                         className="text-lg"
                       />
                     </button>
-                    <p className="text-xs text-stone-500">
-                      Plays Spanish for this step when available.
-                    </p>
                   </div>
-
-                  <div className="mt-8 rounded-xl border border-stone-700/60 bg-stone-950/35 p-4 sm:p-5">
-                    <h3 className="text-xs font-semibold tracking-[0.15em] text-orange-400/90 uppercase">
-                      Your turn — say it
-                    </h3>
-                    <p className="mt-2 text-sm text-stone-400">
-                      Use the microphone or type. Try the Spanish words or
-                      sentences from this step.
-                    </p>
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-stretch">
-                      <button
-                        type="button"
-                        onClick={toggleListening}
-                        className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center self-end rounded-full border font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
-                          isListening
-                            ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
-                            : "border-stone-600/80 bg-stone-800/80 text-orange-400 hover:border-orange-400/40 hover:bg-orange-400/10 hover:text-orange-300"
-                        }`}
-                        aria-label={
-                          isListening ? "Stop recording" : "Speak in Spanish"
-                        }
-                      >
-                        <FontAwesomeIcon
-                          icon={faMicrophone}
-                          className="text-lg"
-                        />
-                      </button>
-                      <input
-                        value={stepSpeechText}
-                        onChange={(e) => {
-                          setStepSpeechText(e.target.value);
-                          setLastPracticeAttempt(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void saveStepPractice();
-                          }
-                        }}
-                        className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/50 px-4 py-2.5 text-stone-100 transition outline-none placeholder:text-stone-500 focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
-                        placeholder="What you said appears here…"
-                        aria-label="Transcript of your Spanish practice"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void saveStepPractice()}
-                        disabled={isSavingPractice}
-                        className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-orange-400 px-5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <FontAwesomeIcon icon={faCheck} className="text-sm" />
-                        Check
-                      </button>
-                    </div>
-                    {lastPracticeAttempt ? (
-                      <div className="mt-3 rounded-xl border border-orange-400/25 bg-orange-400/10 px-4 py-3 text-sm text-orange-100">
-                        Score: {lastPracticeAttempt.score}/100
+                ) : currentStep.spanish || currentStep.english ? (
+                  <div className="mt-5 rounded-xl border border-stone-700/70 bg-stone-950/45 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        {currentStep.spanish ? (
+                          <p className="text-2xl leading-snug font-black text-orange-100">
+                            {currentStep.spanish}
+                          </p>
+                        ) : null}
+                        {currentStep.english ? (
+                          <p className="mt-2 text-sm text-stone-400">
+                            {currentStep.english}
+                          </p>
+                        ) : null}
                       </div>
-                    ) : null}
-                    {practiceHint ? (
-                      <p className="mt-3 text-xs text-stone-500" role="status">
-                        {practiceHint}
+                      {currentStep.spanish ? (
+                        <button
+                          type="button"
+                          onClick={toggleSpeakStepPhrase}
+                          className={speakButtonClasses(isSpeakingPrompt, "lg")}
+                          aria-label={
+                            isSpeakingPrompt
+                              ? "Stop reading phrase aloud"
+                              : "Listen to phrase"
+                          }
+                        >
+                          <FontAwesomeIcon
+                            icon={isSpeakingPrompt ? faStop : faVolume}
+                            className="text-lg"
+                          />
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {currentStep.parts && currentStep.parts.length > 0 ? (
+                  <ul className="mt-4 divide-y divide-stone-700/70 rounded-xl border border-stone-700/70 bg-stone-950/35">
+                    {currentStep.parts.map((part, partIndex) => (
+                      <li
+                        key={`${part.spanish}-${part.english}-${partIndex}`}
+                        className="flex min-h-14 items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-black text-orange-100">
+                            {part.spanish}
+                          </p>
+                          <p className="text-sm text-stone-400">
+                            {part.english}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleSpeakWord(part.spanish)}
+                          className={speakButtonClasses(
+                            speakingWordText === part.spanish,
+                          )}
+                          aria-label={`Listen to ${part.spanish}`}
+                        >
+                          <FontAwesomeIcon
+                            icon={
+                              speakingWordText === part.spanish
+                                ? faStop
+                                : faVolume
+                            }
+                            className="text-sm"
+                          />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {currentStep.kind === "swap" && currentStep.targetSpanish ? (
+                  <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-stone-700/70 bg-stone-950/35 p-4">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">
+                        Replace
                       </p>
+                      <p className="mt-1 text-lg font-black text-white">
+                        {currentStep.targetSpanish}
+                        {currentStep.targetEnglish
+                          ? ` = ${currentStep.targetEnglish}`
+                          : ""}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleSpeakWord(currentStep.targetSpanish ?? "")
+                      }
+                      className={speakButtonClasses(
+                        speakingWordText === currentStep.targetSpanish,
+                      )}
+                      aria-label={`Listen to ${currentStep.targetSpanish}`}
+                    >
+                      <FontAwesomeIcon
+                        icon={
+                          speakingWordText === currentStep.targetSpanish
+                            ? faStop
+                            : faVolume
+                        }
+                        className="text-sm"
+                      />
+                    </button>
+                  </div>
+                ) : null}
+
+                {currentStep.words && currentStep.words.length > 0 ? (
+                  <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {currentStep.words.map((item, itemIndex) => (
+                      <li
+                        key={`${item.spanish}-${item.english}-${itemIndex}`}
+                        className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-stone-700/70 bg-stone-950/35 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-black text-orange-100">
+                            {item.spanish}
+                          </p>
+                          <p className="text-sm text-stone-400">
+                            {item.english}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleSpeakWord(item.spanish)}
+                          className={speakButtonClasses(
+                            speakingWordText === item.spanish,
+                          )}
+                          aria-label={`Listen to ${item.spanish}`}
+                        >
+                          <FontAwesomeIcon
+                            icon={
+                              speakingWordText === item.spanish
+                                ? faStop
+                                : faVolume
+                            }
+                            className="text-sm"
+                          />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div className="mt-7 rounded-xl border border-stone-700/70 bg-stone-950/40 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-xs font-semibold tracking-[0.15em] text-orange-300 uppercase">
+                      Your turn
+                    </h3>
+                    {lastPracticeAttempt ? (
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-bold ${
+                          hasPassingAttempt
+                            ? "bg-teal-400/15 text-teal-100"
+                            : "bg-orange-400/15 text-orange-100"
+                        }`}
+                      >
+                        Score {lastPracticeAttempt.score}/100
+                      </span>
                     ) : null}
                   </div>
-                </div>
-              ) : null}
-
-              <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-stone-700/60 pt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetStepPractice();
-                    setStepIndex((i) => Math.max(0, i - 1));
-                  }}
-                  disabled={stepIndex === 0}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isLastStep) {
-                      void finishLesson();
-                    } else {
-                      resetStepPractice();
-                      setStepIndex((i) => Math.min(steps.length - 1, i + 1));
-                    }
-                  }}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-orange-400 px-5 py-2.5 text-sm font-bold text-stone-950 shadow-lg shadow-orange-500/15 transition hover:bg-orange-300"
-                >
-                  {isLastStep ? "Finish" : "Next"}
-                  {isLastStep ? null : (
-                    <FontAwesomeIcon
-                      icon={faChevronRight}
-                      className="text-xs"
+                  <p className="mt-2 text-sm text-stone-400">
+                    {stepPracticeLabel(currentStep)}
+                  </p>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                    <button
+                      type="button"
+                      onClick={toggleListening}
+                      className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center self-end rounded-full border font-bold transition outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 sm:self-auto ${
+                        isListening
+                          ? "border-red-500/50 bg-red-600 text-white hover:bg-red-500"
+                          : "border-stone-600 bg-stone-800 text-orange-300 hover:border-orange-400/50 hover:bg-orange-400/10"
+                      }`}
+                      aria-label={
+                        isListening ? "Stop recording" : "Speak in Spanish"
+                      }
+                    >
+                      <FontAwesomeIcon
+                        icon={faMicrophone}
+                        className="text-lg"
+                      />
+                    </button>
+                    <input
+                      value={stepSpeechText}
+                      onChange={(e) => {
+                        setStepSpeechText(e.target.value);
+                        setLastPracticeAttempt(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void saveStepPractice();
+                        }
+                      }}
+                      className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-600/80 bg-stone-900/80 px-4 py-2.5 text-stone-100 transition outline-none placeholder:text-stone-500 focus:border-orange-400/45 focus:ring-2 focus:ring-orange-400/30"
+                      placeholder="Type or dictate Spanish..."
+                      aria-label="Transcript of your Spanish practice"
                     />
-                  )}
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveStepPractice()}
+                      disabled={isSavingPractice}
+                      className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-orange-400 px-5 text-sm font-bold text-stone-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FontAwesomeIcon icon={faCheck} className="text-sm" />
+                      Check
+                    </button>
+                  </div>
+                  {practiceHint ? (
+                    <p className="mt-3 text-sm text-stone-400" role="status">
+                      {practiceHint}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-            </section>
-
-            {lesson.practiceQuestions.length > 0 &&
-            currentStep?.kind === "practice" ? (
-              <section className="rounded-2xl border border-stone-700/80 bg-stone-900/40 p-5 shadow-lg ring-1 shadow-black/20 ring-white/5 sm:p-6">
-                <h3 className="text-xs font-semibold tracking-[0.18em] text-orange-400/90 uppercase">
-                  Extra prompts
-                </h3>
-                <ul className="mt-3 list-disc space-y-2 pl-5 text-stone-300">
-                  {lesson.practiceQuestions.map((q, questionIndex) => (
-                    <li key={`${q}-${questionIndex}`} className="text-pretty">
-                      {q}
-                    </li>
-                  ))}
-                </ul>
-              </section>
             ) : null}
-          </>
+
+            <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-stone-700/70 pt-5">
+              <button
+                type="button"
+                onClick={() => {
+                  resetStepPractice();
+                  setStepIndex((i) => Math.max(0, i - 1));
+                }}
+                disabled={stepIndex === 0}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-600 px-5 py-2.5 text-sm font-bold text-stone-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={goToNextStep}
+                aria-disabled={!hasPassingAttempt}
+                className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold shadow-lg shadow-orange-500/15 transition ${
+                  hasPassingAttempt
+                    ? "bg-orange-400 text-stone-950 hover:bg-orange-300"
+                    : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                }`}
+              >
+                {isLastStep ? "Finish" : "Next"}
+                {isLastStep ? null : (
+                  <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+                )}
+              </button>
+            </div>
+
+            {status ? (
+              <p className="mt-4 text-sm text-stone-400" role="status">
+                {status}
+              </p>
+            ) : null}
+          </section>
         ) : null}
       </div>
     </div>

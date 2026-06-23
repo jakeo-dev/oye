@@ -1,4 +1,3 @@
-import { buildLessonStepsFromCore } from "@/lib/lessonSteps";
 import { getCurriculumSection } from "@/lib/curriculum";
 import type { CurriculumSection } from "@/lib/curriculum";
 import {
@@ -14,6 +13,7 @@ import {
 } from "@/lib/ollamaGenerationOptions";
 import type { OllamaGenerationOptions } from "@/lib/ollamaGenerationOptions";
 
+import { buildLessonStepsFromCore } from "../lib/lessonSteps";
 import type {
   AppSettings,
   Lesson,
@@ -36,6 +36,12 @@ type OllamaOptions = {
 
 type OllamaGenerateResponse = {
   response?: string;
+};
+
+type FallbackLessonCore = {
+  spanishPrompt: string;
+  englishTranslation: string;
+  vocabulary: VocabularyItem[];
 };
 
 type OllamaTagsResponse = {
@@ -83,7 +89,9 @@ const lessonGenerationTimeoutMs = 120000;
 export function getOllamaConfig(options: OllamaOptions | AppSettings = {}) {
   const settings = "ollamaBaseUrl" in options ? options : null;
   const optionOverrides =
-    "ollamaOptions" in options ? options.ollamaOptions : settings?.ollamaOptions;
+    "ollamaOptions" in options
+      ? options.ollamaOptions
+      : settings?.ollamaOptions;
   return {
     baseUrl: (
       ("baseUrl" in options ? options.baseUrl : settings?.ollamaBaseUrl) ??
@@ -138,6 +146,27 @@ function asStringArray(value: unknown): string[] {
 function stringOrDefault(value: unknown, fallback: string): string {
   const text = typeof value === "string" ? value.trim() : "";
   return text || fallback;
+}
+
+function isLikelyMalformedSpanishPhrase(value: string): boolean {
+  const text = value.trim();
+  if (!text) {
+    return true;
+  }
+  if (text.length > 140 || text.split(/\s+/).length > 18) {
+    return true;
+  }
+  if (/[\n\r{}[\]]/.test(text)) {
+    return true;
+  }
+  if (
+    /\b(step|breakdown|swap|english|spanish|translation|lesson|phrase)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function parseVocabularyArray(value: unknown): VocabularyItem[] {
@@ -208,14 +237,26 @@ function parseLessonStepsRaw(raw: unknown): LessonStep[] {
     const body = String(rec.body ?? rec.content ?? rec.text ?? "").trim();
     const spanish = String(rec.spanish ?? rec.exampleSpanish ?? "").trim();
     const english = String(rec.english ?? rec.exampleEnglish ?? "").trim();
+    const targetSpanish = String(rec.targetSpanish ?? "").trim();
+    const targetEnglish = String(rec.targetEnglish ?? "").trim();
+    const acceptedSpanish = asStringArray(
+      rec.acceptedSpanish ?? rec.acceptedPhrases,
+    );
+    const listenOnly = rec.listenOnly === true;
     const words = parseVocabularyArray(rec.words ?? rec.items);
+    const parts = parseVocabularyArray(rec.parts ?? rec.breakdownParts);
     steps.push({
       kind,
       title,
       body,
+      ...(parts.length ? { parts } : {}),
       ...(words.length ? { words } : {}),
       ...(spanish ? { spanish } : {}),
       ...(english ? { english } : {}),
+      ...(targetSpanish ? { targetSpanish } : {}),
+      ...(targetEnglish ? { targetEnglish } : {}),
+      ...(acceptedSpanish.length ? { acceptedSpanish } : {}),
+      ...(listenOnly ? { listenOnly } : {}),
     });
   }
   return steps;
@@ -249,6 +290,330 @@ function modelNameMatches(
     availableModel === `${configuredModel}:latest` ||
     availableModel.startsWith(`${configuredModel}:`)
   );
+}
+
+const sectionFallbacks: Record<string, FallbackLessonCore> = {
+  "alphabet-pronunciation": {
+    spanishPrompt: "La estacion esta en la calle Colon.",
+    englishTranslation: "The station is on Colon Street.",
+    vocabulary: [
+      { spanish: "estacion", english: "station" },
+      { spanish: "calle Colon", english: "Colon Street" },
+      { spanish: "playa", english: "beach" },
+      { spanish: "farmacia", english: "pharmacy" },
+      { spanish: "plaza Luceros", english: "Luceros Square" },
+      { spanish: "avenida Maisonnave", english: "Maisonnave Avenue" },
+    ],
+  },
+  "nouns-gender": {
+    spanishPrompt: "Necesito una habitacion y un mapa.",
+    englishTranslation: "I need a room and a map.",
+    vocabulary: [
+      { spanish: "habitacion", english: "room" },
+      { spanish: "mapa", english: "map" },
+      { spanish: "maleta", english: "suitcase" },
+      { spanish: "reserva", english: "reservation" },
+      { spanish: "taxi", english: "taxi" },
+      { spanish: "billete", english: "ticket" },
+    ],
+  },
+  articles: {
+    spanishPrompt: "Quiero el billete y una botella de agua.",
+    englishTranslation: "I want the ticket and a bottle of water.",
+    vocabulary: [
+      { spanish: "el billete", english: "the ticket" },
+      { spanish: "una botella", english: "a bottle" },
+      { spanish: "la cuenta", english: "the bill" },
+      { spanish: "un cafe", english: "a coffee" },
+      { spanish: "un vaso", english: "a glass" },
+      { spanish: "una mesa", english: "a table" },
+    ],
+  },
+  adjectives: {
+    spanishPrompt: "La mesa pequena esta libre.",
+    englishTranslation: "The small table is free.",
+    vocabulary: [
+      { spanish: "mesa", english: "table" },
+      { spanish: "pequena", english: "small" },
+      { spanish: "habitacion", english: "room" },
+      { spanish: "maleta", english: "suitcase" },
+      { spanish: "grande", english: "big" },
+      { spanish: "tranquila", english: "quiet" },
+    ],
+  },
+  "subject-pronouns": {
+    spanishPrompt: "Yo tengo reserva y usted tiene mi nombre.",
+    englishTranslation: "I have a reservation and you have my name.",
+    vocabulary: [
+      { spanish: "yo", english: "I" },
+      { spanish: "usted", english: "you, formal" },
+      { spanish: "nosotros", english: "we" },
+      { spanish: "ellos", english: "they" },
+      { spanish: "reserva", english: "reservation" },
+      { spanish: "pasaporte", english: "passport" },
+    ],
+  },
+  "present-tense-verbs": {
+    spanishPrompt: "Compro dos billetes y subo al tren.",
+    englishTranslation: "I buy two tickets and get on the train.",
+    vocabulary: [
+      { spanish: "compro", english: "I buy" },
+      { spanish: "subo", english: "I get on" },
+      { spanish: "reservo", english: "I reserve" },
+      { spanish: "busco", english: "I look for" },
+      { spanish: "tren", english: "train" },
+      { spanish: "autobus", english: "bus" },
+    ],
+  },
+  "irregular-present-tense-verbs": {
+    spanishPrompt: "Tengo una pregunta y quiero ayuda.",
+    englishTranslation: "I have a question and I want help.",
+    vocabulary: [
+      { spanish: "tengo", english: "I have" },
+      { spanish: "quiero", english: "I want" },
+      { spanish: "hago", english: "I do / make" },
+      { spanish: "voy", english: "I go" },
+      { spanish: "pregunta", english: "question" },
+      { spanish: "respuesta", english: "answer" },
+    ],
+  },
+  "ser-estar": {
+    spanishPrompt: "El hotel es tranquilo y esta cerca.",
+    englishTranslation: "The hotel is quiet and is nearby.",
+    vocabulary: [
+      { spanish: "es", english: "is, identity/quality" },
+      { spanish: "esta", english: "is, location/state" },
+      { spanish: "restaurante", english: "restaurant" },
+      { spanish: "mercado", english: "market" },
+      { spanish: "tranquilo", english: "quiet" },
+      { spanish: "lleno", english: "full" },
+    ],
+  },
+  "negation-questions": {
+    spanishPrompt: "No entiendo, donde esta la salida?",
+    englishTranslation: "I do not understand; where is the exit?",
+    vocabulary: [
+      { spanish: "no entiendo", english: "I do not understand" },
+      { spanish: "donde", english: "where" },
+      { spanish: "no se", english: "I do not know" },
+      { spanish: "no tengo", english: "I do not have" },
+      { spanish: "salida", english: "exit" },
+      { spanish: "entrada", english: "entrance" },
+    ],
+  },
+  "basic-sentence-expansion": {
+    spanishPrompt: "Quiero cafe, pero necesito agua tambien.",
+    englishTranslation: "I want coffee, but I also need water.",
+    vocabulary: [
+      { spanish: "pero", english: "but" },
+      { spanish: "tambien", english: "also" },
+      { spanish: "porque", english: "because" },
+      { spanish: "entonces", english: "then / so" },
+      { spanish: "cafe", english: "coffee" },
+      { spanish: "agua", english: "water" },
+    ],
+  },
+  possessives: {
+    spanishPrompt: "Mi maleta esta en su oficina.",
+    englishTranslation: "My suitcase is in your office.",
+    vocabulary: [
+      { spanish: "mi", english: "my" },
+      { spanish: "su", english: "your / his / her" },
+      { spanish: "tu", english: "your, informal" },
+      { spanish: "nuestra", english: "our, feminine" },
+      { spanish: "maleta", english: "suitcase" },
+      { spanish: "bolsa", english: "bag" },
+    ],
+  },
+  prepositions: {
+    spanishPrompt: "Voy al mercado con mi amigo.",
+    englishTranslation: "I am going to the market with my friend.",
+    vocabulary: [
+      { spanish: "al", english: "to the" },
+      { spanish: "con", english: "with" },
+      { spanish: "del", english: "from/of the" },
+      { spanish: "para", english: "for" },
+      { spanish: "mercado", english: "market" },
+      { spanish: "hotel", english: "hotel" },
+    ],
+  },
+  "object-pronouns": {
+    spanishPrompt: "Lo quiero ahora y le doy mi tarjeta.",
+    englishTranslation: "I want it now and I give you my card.",
+    vocabulary: [
+      { spanish: "lo", english: "it, masculine direct object" },
+      { spanish: "le", english: "to you / to him / to her" },
+      { spanish: "la", english: "it, feminine direct object" },
+      { spanish: "les", english: "to you all / to them" },
+      { spanish: "tarjeta", english: "card" },
+      { spanish: "dinero", english: "money" },
+    ],
+  },
+  "reflexive-verbs": {
+    spanishPrompt: "Me siento mal y necesito medicina.",
+    englishTranslation: "I feel sick and need medicine.",
+    vocabulary: [
+      { spanish: "me siento", english: "I feel" },
+      { spanish: "necesito", english: "I need" },
+      { spanish: "me llamo", english: "my name is" },
+      { spanish: "me quedo", english: "I am staying" },
+      { spanish: "medicina", english: "medicine" },
+      { spanish: "ayuda", english: "help" },
+    ],
+  },
+  commands: {
+    spanishPrompt: "Por favor, llameme cuando llegue el taxi.",
+    englishTranslation: "Please call me when the taxi arrives.",
+    vocabulary: [
+      { spanish: "llameme", english: "call me, formal" },
+      { spanish: "llegue", english: "arrives" },
+      { spanish: "ayudeme", english: "help me, formal" },
+      { spanish: "digame", english: "tell me, formal" },
+      { spanish: "taxi", english: "taxi" },
+      { spanish: "tren", english: "train" },
+    ],
+  },
+  "near-future": {
+    spanishPrompt: "Voy a comprar pan en el mercado.",
+    englishTranslation: "I am going to buy bread at the market.",
+    vocabulary: [
+      { spanish: "voy a comprar", english: "I am going to buy" },
+      { spanish: "pan", english: "bread" },
+      { spanish: "voy a tomar", english: "I am going to take/drink" },
+      { spanish: "voy a buscar", english: "I am going to look for" },
+      { spanish: "mercado", english: "market" },
+      { spanish: "cafeteria", english: "cafe" },
+    ],
+  },
+  preterite: {
+    spanishPrompt: "Compre el billete ayer.",
+    englishTranslation: "I bought the ticket yesterday.",
+    vocabulary: [
+      { spanish: "compre", english: "I bought" },
+      { spanish: "ayer", english: "yesterday" },
+      { spanish: "pague", english: "I paid" },
+      { spanish: "llegue", english: "I arrived" },
+      { spanish: "billete", english: "ticket" },
+      { spanish: "cafe", english: "coffee" },
+    ],
+  },
+  imperfect: {
+    spanishPrompt: "El tren salia tarde cada manana.",
+    englishTranslation: "The train used to leave late every morning.",
+    vocabulary: [
+      { spanish: "salia", english: "used to leave" },
+      { spanish: "cada manana", english: "every morning" },
+      { spanish: "estaba", english: "was" },
+      { spanish: "tenia", english: "had" },
+      { spanish: "tren", english: "train" },
+      { spanish: "autobus", english: "bus" },
+    ],
+  },
+  future: {
+    spanishPrompt: "Llegare al hotel esta noche.",
+    englishTranslation: "I will arrive at the hotel tonight.",
+    vocabulary: [
+      { spanish: "llegare", english: "I will arrive" },
+      { spanish: "esta noche", english: "tonight" },
+      { spanish: "comprare", english: "I will buy" },
+      { spanish: "buscare", english: "I will look for" },
+      { spanish: "hotel", english: "hotel" },
+      { spanish: "aeropuerto", english: "airport" },
+    ],
+  },
+  conditional: {
+    spanishPrompt: "Quisiera una mesa junto a la ventana.",
+    englishTranslation: "I would like a table next to the window.",
+    vocabulary: [
+      { spanish: "quisiera", english: "I would like" },
+      { spanish: "junto a", english: "next to" },
+      { spanish: "podria", english: "could I / could you" },
+      { spanish: "me gustaria", english: "I would like" },
+      { spanish: "mesa", english: "table" },
+      { spanish: "barra", english: "bar / counter" },
+    ],
+  },
+  "progressive-tenses": {
+    spanishPrompt: "Estoy buscando la puerta ahora.",
+    englishTranslation: "I am looking for the gate now.",
+    vocabulary: [
+      { spanish: "estoy buscando", english: "I am looking for" },
+      { spanish: "ahora", english: "now" },
+      { spanish: "estoy esperando", english: "I am waiting" },
+      { spanish: "estoy comprando", english: "I am buying" },
+      { spanish: "puerta", english: "gate / door" },
+      { spanish: "salida", english: "exit" },
+    ],
+  },
+  "perfect-tenses": {
+    spanishPrompt: "He perdido mi pasaporte.",
+    englishTranslation: "I have lost my passport.",
+    vocabulary: [
+      { spanish: "he perdido", english: "I have lost" },
+      { spanish: "pasaporte", english: "passport" },
+      { spanish: "he comprado", english: "I have bought" },
+      { spanish: "he reservado", english: "I have reserved" },
+      { spanish: "maleta", english: "suitcase" },
+      { spanish: "tarjeta", english: "card" },
+    ],
+  },
+  subjunctive: {
+    spanishPrompt: "Quiero que me ayude, por favor.",
+    englishTranslation: "I want you to help me, please.",
+    vocabulary: [
+      { spanish: "quiero que", english: "I want that / I want you to" },
+      { spanish: "me ayude", english: "you help me, formal subjunctive" },
+      { spanish: "espero que", english: "I hope that" },
+      { spanish: "es posible que", english: "it is possible that" },
+      { spanish: "me llame", english: "you call me" },
+      { spanish: "me espere", english: "you wait for me" },
+    ],
+  },
+  "relative-pronouns": {
+    spanishPrompt: "Busco el hotel que esta cerca del puerto.",
+    englishTranslation: "I am looking for the hotel that is near the port.",
+    vocabulary: [
+      { spanish: "que", english: "that / which" },
+      { spanish: "cerca del puerto", english: "near the port" },
+      { spanish: "quien", english: "who / whom" },
+      { spanish: "lo que", english: "what / the thing that" },
+      { spanish: "hotel", english: "hotel" },
+      { spanish: "restaurante", english: "restaurant" },
+    ],
+  },
+  "advanced-sentence-structure": {
+    spanishPrompt: "Aunque estoy cansado, quiero visitar el museo.",
+    englishTranslation: "Although I am tired, I want to visit the museum.",
+    vocabulary: [
+      { spanish: "aunque", english: "although" },
+      { spanish: "quiero visitar", english: "I want to visit" },
+      { spanish: "sin embargo", english: "however" },
+      { spanish: "por eso", english: "therefore / that is why" },
+      { spanish: "museo", english: "museum" },
+      { spanish: "castillo", english: "castle" },
+    ],
+  },
+};
+
+function getFallbackCoreForSection(
+  curriculumSection: CurriculumSection | null,
+): FallbackLessonCore {
+  if (!curriculumSection) {
+    return {
+      spanishPrompt: "Hola, quiero un cafe con leche, por favor.",
+      englishTranslation: "Hello, I want a coffee with milk, please.",
+      vocabulary: [
+        { spanish: "quiero", english: "I want" },
+        { spanish: "cafe con leche", english: "coffee with milk" },
+        { spanish: "agua", english: "water" },
+        { spanish: "te", english: "tea" },
+        { spanish: "por favor", english: "please" },
+        { spanish: "gracias", english: "thank you" },
+      ],
+    };
+  }
+
+  return sectionFallbacks[curriculumSection.id] ?? sectionFallbacks.articles;
 }
 
 async function fetchWithTimeout(
@@ -408,6 +773,7 @@ function createFallbackLesson(input: LessonGenerationInput): Lesson {
   const scenario =
     input.scenario ?? input.topic ?? "ordering coffee in Alicante";
   const curriculumSection = getCurriculumSection(input.curriculumSectionId);
+  const fallbackCore = getFallbackCoreForSection(curriculumSection);
   const core = {
     title: curriculumSection
       ? `${curriculumSection.title} in Context`
@@ -415,21 +781,16 @@ function createFallbackLesson(input: LessonGenerationInput): Lesson {
     touristFocus: curriculumSection
       ? `${curriculumSection.focus} Practice this through the selected scenario.`
       : "Polite cafe ordering and simple follow-up questions.",
-    spanishPrompt: curriculumSection
-      ? "El cafe es pequeno, pero la mesa es grande."
-      : "Hola, quiero un cafe con leche, por favor.",
-    englishTranslation: curriculumSection
-      ? "The coffee is small, but the table is big."
-      : "Hello, I want a coffee with milk, please.",
-    vocabulary: [
-      { spanish: "quiero", english: "I want" },
-      { spanish: "por favor", english: "please" },
-      { spanish: "gracias", english: "thank you" },
-    ] as VocabularyItem[],
+    spanishPrompt: fallbackCore.spanishPrompt,
+    englishTranslation: fallbackCore.englishTranslation,
+    vocabulary: fallbackCore.vocabulary,
     practiceQuestions: [
-      "How would you politely ask for water?",
-      "Say thank you after receiving your order.",
+      "Repeat the phrase slowly once.",
+      "Swap one word and keep the same grammar pattern.",
     ],
+    curriculumPartTitle: curriculumSection?.partTitle,
+    curriculumSectionTitle: curriculumSection?.title,
+    curriculumFocus: curriculumSection?.focus,
   };
 
   return {
@@ -465,7 +826,8 @@ function buildLessonPrompt({
   aiResponseFlavor: AiResponseFlavor;
   customAiInstructions: string;
 }): string {
-  const customInstructionLine = getCustomAiInstructionLine(customAiInstructions);
+  const customInstructionLine =
+    getCustomAiInstructionLine(customAiInstructions);
   const curriculumLines = curriculumSection
     ? [
         `Curriculum part: ${curriculumSection.partTitle}`,
@@ -485,9 +847,14 @@ function buildLessonPrompt({
   return [
     "Create a short task-based Spanish lesson for an English-speaking tourist beginner in Alicante.",
     ...curriculumLines,
-    "Return only JSON with this exact shape (steps must be 7 to 8 items, in teaching order):",
-    '{"title":"string","scenario":"string","touristFocus":"string","spanishPrompt":"string","englishTranslation":"string","vocabulary":[{"spanish":"string","english":"string"}],"practiceQuestions":["string"],"steps":[{"kind":"goal|phrases|breakdown|swap|grammar|scenario|practice|review","title":"string","body":"string","words":[{"spanish":"string","english":"string"}],"spanish":"string","english":"string"}]}',
-    "Rules for steps: goal first (what real-world task the learner can do), phrases second (2-4 immediately useful lines; include words array when helpful), breakdown third (explain the key phrase piece by piece), swap fourth (show substitutions the learner can make; include words array), grammar fifth (short contextual note), scenario sixth (tiny back-and-forth situation), practice seventh (one focused production task; body with 2-4 prompts), review last (3-5 things to remember).",
+    "Return only JSON with this exact shape (steps must be exactly 5 items, in this order):",
+    '{"title":"string","scenario":"string","touristFocus":"string","spanishPrompt":"string","englishTranslation":"string","vocabulary":[{"spanish":"string","english":"string"}],"practiceQuestions":["string"],"steps":[{"kind":"phrase|breakdown|swap|review","title":"string","body":"string","parts":[{"spanish":"string","english":"string"}],"words":[{"spanish":"string","english":"string"}],"spanish":"string","english":"string","targetSpanish":"string","targetEnglish":"string","acceptedSpanish":["string"],"listenOnly":false}]}',
+    "Keep every body field under 24 words. Do not put JSON, markdown, numbered lists, or multi-paragraph explanations inside body.",
+    "Step 1 kind phrase: introduce one new complete Spanish phrase tied to the scenario and the current grammar section; include spanish, english, and acceptedSpanish with the original phrase.",
+    "Step 2 kind breakdown: put each meaningful part of the phrase in parts as Spanish/English pairs; include the same spanish, english, and acceptedSpanish with the original phrase.",
+    "Step 3 kind swap: choose one word or short phrase from the original phrase as targetSpanish, give 3-5 new replacement words in words, and include acceptedSpanish as complete full phrases with that target replaced by each option.",
+    "Step 4 kind swap: choose a different targetSpanish from the original phrase, give 3-5 new replacement words in words, and include acceptedSpanish as complete full phrases with that different target replaced by each option.",
+    "Step 5 kind review: listen-only recall of the original phrase; include the original spanish for audio, english, acceptedSpanish with the original phrase, and listenOnly true.",
     "Omit optional fields when empty.",
     `AI response flavor: ${getAiFlavorInstruction(aiResponseFlavor)}`,
     customInstructionLine ?? "",
@@ -540,33 +907,28 @@ export async function generateLessonWithOllama(
     generated.touristFocus,
     fallbackLesson.touristFocus,
   );
-  const spanishPrompt = stringOrDefault(
+  const generatedSpanishPrompt = stringOrDefault(
     generated.spanishPrompt,
     fallbackLesson.spanishPrompt,
   );
+  const spanishPrompt = isLikelyMalformedSpanishPhrase(generatedSpanishPrompt)
+    ? fallbackLesson.spanishPrompt
+    : generatedSpanishPrompt;
   const englishTranslation = stringOrDefault(
     generated.englishTranslation,
     fallbackLesson.englishTranslation,
   );
   const practiceQuestions = asStringArray(generated.practiceQuestions);
 
-  let steps = parseLessonStepsRaw(generated.steps);
-  if (steps.length === 0) {
-    steps = buildLessonStepsFromCore({
-      title,
-      touristFocus,
-      spanishPrompt,
-      englishTranslation,
-      vocabulary,
-      practiceQuestions,
-    });
-  }
+  const generatedSteps = parseLessonStepsRaw(generated.steps);
 
   let mergedVocabulary = vocabulary;
   if (mergedVocabulary.length === 0) {
-    const fromStep = steps.find(
+    const fromStep = generatedSteps.find(
       (s) =>
-        (s.kind === "phrases" || s.kind === "swap" || s.kind === "vocabulary") &&
+        (s.kind === "phrases" ||
+          s.kind === "swap" ||
+          s.kind === "vocabulary") &&
         s.words &&
         s.words.length > 0,
     )?.words;
@@ -577,6 +939,24 @@ export async function generateLessonWithOllama(
   if (mergedVocabulary.length === 0) {
     mergedVocabulary = fallbackLesson.vocabulary;
   }
+  const generatedStepVocabulary = generatedSteps.flatMap((step) => [
+    ...(step.parts ?? []),
+    ...(step.words ?? []),
+  ]);
+  const canonicalPracticeQuestions = practiceQuestions.length
+    ? practiceQuestions
+    : fallbackLesson.practiceQuestions;
+  const steps = buildLessonStepsFromCore({
+    title,
+    touristFocus,
+    spanishPrompt,
+    englishTranslation,
+    vocabulary: [...mergedVocabulary, ...generatedStepVocabulary],
+    practiceQuestions: canonicalPracticeQuestions,
+    curriculumPartTitle: curriculumSection?.partTitle,
+    curriculumSectionTitle: curriculumSection?.title,
+    curriculumFocus: curriculumSection?.focus,
+  });
 
   return {
     ...fallbackLesson,
@@ -591,9 +971,7 @@ export async function generateLessonWithOllama(
     spanishPrompt,
     englishTranslation,
     vocabulary: mergedVocabulary,
-    practiceQuestions: practiceQuestions.length
-      ? practiceQuestions
-      : fallbackLesson.practiceQuestions,
+    practiceQuestions: canonicalPracticeQuestions,
     steps,
     source: "ollama",
   };
